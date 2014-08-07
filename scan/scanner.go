@@ -33,6 +33,10 @@ func NewBufferScanner(pat string, buf []byte) (*Scanner, error) {
 }
 
 func (s *Scanner) Scan() bool {
+	if s.pos >= len(s.buf) {
+		s.err = io.EOF
+		return false
+	}
 	m := s.FindSubmatchIndex(s.buf[s.pos:])
 	if m == nil {
 		s.err = fmt.Errorf("token patterns do not cover all possible input, %s, %s.", string(s.buf[s.pos:]), s.Regexp.String())

@@ -29,7 +29,7 @@ func main() {
 		inlineComment  = con(pat(`//`), inline.ZeroOrMore(), or(newline, empty))
 		quoted         = or(inline.Exclude(char(`"`)), pat(`\\"`))
 		quotedString   = con(pat(`"`), quoted.ZeroOrMore(), pat(`"`))
-		unquoted       = nonctrl.Exclude(delim)
+		unquoted       = nonctrl.Exclude(merge(delim, char(` `)))
 		unquotedString = unquoted.OneOrMore()
 
 		tokens = Tokens(

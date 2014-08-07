@@ -2,6 +2,7 @@ package scan
 
 import (
 	"fmt"
+	"io"
 	"testing"
 
 	"github.com/hailiang/gspec/core"
@@ -81,6 +82,7 @@ var _ = suite.Add(func(s core.S) {
 		tokens := Tokens(a, s, b)
 		scanner, _ := NewBufferScanner(tokens.String(), []byte("b a"))
 		expect(scanner.Scan()).Equal(true)
+		expect(scanner.Error()).Equal(nil)
 		expect(scanner.Token()).Equal(
 			Token{
 				Type:  2,
@@ -88,6 +90,7 @@ var _ = suite.Add(func(s core.S) {
 				Pos:   0,
 			})
 		expect(scanner.Scan()).Equal(true)
+		expect(scanner.Error()).Equal(nil)
 		expect(scanner.Token()).Equal(
 			Token{
 				Type:  1,
@@ -95,12 +98,15 @@ var _ = suite.Add(func(s core.S) {
 				Pos:   1,
 			})
 		expect(scanner.Scan()).Equal(true)
+		expect(scanner.Error()).Equal(nil)
 		expect(scanner.Token()).Equal(
 			Token{
 				Type:  0,
 				Value: []byte("a"),
 				Pos:   2,
 			})
+		expect(scanner.Scan()).Equal(false)
+		expect(scanner.Error()).Equal(io.EOF)
 	})
 })
 
