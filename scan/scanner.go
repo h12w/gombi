@@ -31,7 +31,7 @@ func (s *Scanner) Scan() bool {
 	m := s.rx.FindReaderSubmatchIndex(s.buf)
 	if m == nil {
 		if _, _, err := s.buf.ReadRune(); err != nil {
-			s.err = io.EOF
+			s.err = err
 		} else {
 			s.err = fmt.Errorf("token patterns do not cover all possible input, %s, %s.", string(s.buf.bytes()), s.rx.String())
 		}
