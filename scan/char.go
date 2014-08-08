@@ -56,8 +56,13 @@ func rMin(a, b rune) rune {
 	return b
 }
 
-func (p CharSet) Exclude(s CharSet) CharSet {
-	return Merge(p.Negate(), s).Negate()
+func (p CharSet) Exclude(cs ...CharSet) CharSet {
+	es := make(exprs, len(cs))
+	for i := range cs {
+		es[i] = cs[i]
+	}
+	subset := Merge(es...)
+	return Merge(p.Negate(), subset).Negate()
 }
 
 func Merge(es ...Expr) CharSet {
