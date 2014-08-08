@@ -80,7 +80,7 @@ var _ = suite.Add(func(s core.S) {
 		s := Char(` `)
 		b := Char(`b`)
 		tokens := Tokens(a, s, b)
-		scanner, _ := NewBufferScanner(tokens.String(), []byte("b a"))
+		scanner, _ := NewStringScanner(tokens.String(), "b a")
 		expect(scanner.Scan()).Equal(true)
 		expect(scanner.Error()).Equal(nil)
 		expect(scanner.Token()).Equal(

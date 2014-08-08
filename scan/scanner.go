@@ -3,13 +3,12 @@ package scan
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
+	"strings"
 )
 
 type Scanner struct {
-	rx
-	buf []byte
-	pos int
+	rx  rx
+	buf *Buffer
 	err error
 	tok Token
 }
@@ -21,35 +20,35 @@ type Token struct {
 }
 
 func NewScanner(pat string, r io.Reader) (*Scanner, error) {
-	buf, err := ioutil.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
-	return &Scanner{buf: buf, rx: rx{compile(pat)}}, nil
+	return &Scanner{buf: NewBuffer(r), rx: rx{compile(pat)}}, nil
 }
 
-func NewBufferScanner(pat string, buf []byte) (*Scanner, error) {
-	return &Scanner{buf: buf, rx: rx{compile(pat)}}, nil
+func NewStringScanner(pat, text string) (*Scanner, error) {
+	return &Scanner{buf: NewBuffer(strings.NewReader(text)), rx: rx{compile(pat)}}, nil
 }
 
 func (s *Scanner) Scan() bool {
-	if s.pos >= len(s.buf) {
-		s.err = io.EOF
-		return false
-	}
-	m := s.FindSubmatchIndex(s.buf[s.pos:])
+	m := s.rx.FindReaderSubmatchIndex(s.buf)
 	if m == nil {
-		s.err = fmt.Errorf("token patterns do not cover all possible input, %s, %s.", string(s.buf[s.pos:]), s.Regexp.String())
+		if _, _, err := s.buf.ReadRune(); err != nil {
+			s.err = io.EOF
+		} else {
+			s.err = fmt.Errorf("token patterns do not cover all possible input, %s, %s.", string(s.buf.bytes()), s.rx.String())
+		}
 		return false
 	}
 	for i := 2; i < len(m)-1; i += 2 {
 		if m[i] != -1 {
+			token, pos, err := s.buf.ReadToken(m[i+1])
+			if err != nil {
+				s.err = err
+				return false
+			}
 			s.tok = Token{
 				Type:  i/2 - 1,
-				Value: s.buf[s.pos:][0:m[i+1]],
-				Pos:   s.pos,
+				Value: append([]byte{}, token...),
+				Pos:   pos,
 			}
-			s.pos += m[i+1]
 			return true
 		}
 	}
