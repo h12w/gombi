@@ -6,15 +6,14 @@ import (
 )
 
 type state struct {
-	id   string
-	term bool
+	*rule
 	*alt
 	i int // input position
 	d int // dot position
 }
 
 func (s *state) expr() string {
-	return fmt.Sprintf("%s(%d) ::= %v•%v", s.id, s.i, s.alt.rules[:s.d].expr(), s.alt.rules[s.d:].expr())
+	return fmt.Sprintf("%s(%d) ::= %v•%v", s.name, s.i, s.alt.rules[:s.d].expr(), s.alt.rules[s.d:].expr())
 }
 
 func (s *state) complete() bool {
@@ -25,8 +24,8 @@ func (s *state) next() *rule {
 	return s.alt.rules[s.d]
 }
 
-func (s *state) nextIs(id string) bool {
-	return !s.complete() && s.alt.rules[s.d].id == id
+func (s *state) expect(r *rule) bool {
+	return !s.complete() && s.alt.rules[s.d] == r
 }
 
 type stateSet struct {

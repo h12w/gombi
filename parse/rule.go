@@ -7,8 +7,7 @@ import (
 
 type (
 	rule struct {
-		id   string
-		term bool
+		name string
 		alts
 	}
 	alt struct {
@@ -19,15 +18,15 @@ type (
 )
 
 func term(s string) *rule {
-	return &rule{id: s, term: true, alts: nil}
+	return &rule{name: s}
 }
 
 func (r *rule) expr() string {
-	return r.id
+	return r.name
 }
 
 func (r *rule) def() string {
-	return fmt.Sprintf("%s ::= %s", r.id, r.alts.expr())
+	return fmt.Sprintf("%s ::= %s", r.name, r.alts.expr())
 }
 
 func (rs rules) expr() string {

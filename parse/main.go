@@ -2,58 +2,85 @@ package main
 
 import "fmt"
 
-func main() {
-	P := grammar()
-	s0 := newStateSet()
-	s0.add(&state{P.id, P.term, P.alts[0], 0, 0})
-	ss := []*stateSet{s0}
-	tokens := []string{"2", "+", "3", "*", "4"}
+type token struct {
+	value string
+	*rule
+}
 
-	for i := 0; i <= len(tokens); i++ {
+type testScanner struct {
+	tokens []token
+	i      int
+}
+
+func newTestScanner(tokens []token) *testScanner {
+	return &testScanner{tokens: tokens, i: -1}
+}
+
+func (s *testScanner) scan() bool {
+	s.i++
+	return s.i < len(s.tokens)
+}
+
+func (s *testScanner) token() *token {
+	return &s.tokens[s.i]
+}
+
+func main() {
+	T := term("T")
+	Plus := term("+")
+	Mult := term("*")
+
+	M := &rule{name: "M"}
+	M.alts = alts{
+		{rules{M, Mult, T}},
+		{rules{T}},
+	}
+
+	S := &rule{name: "S"}
+	S.alts = alts{
+		{rules{S, Plus, M}},
+		{rules{M}},
+	}
+
+	EOF := term("EOF")
+
+	P := &rule{name: "P", alts: alts{{rules{S, EOF}}}}
+
+	s0 := newStateSet()
+	s0.add(&state{P, P.alts[0], 0, 0})
+	ss := []*stateSet{s0}
+
+	scanner := newTestScanner([]token{
+		{"2", T},
+		{"+", Plus},
+		{"3", T},
+		{"*", Mult},
+		{"4", T},
+		{"", EOF},
+	})
+
+	i := 0
+	for scanner.scan() {
 		ss = append(ss, newStateSet())
 		ss[i].each(func(s state) {
 			if s.complete() { // complete
 				ss[s.i].each(func(os state) {
-					if os.nextIs(s.id) {
+					if os.expect(s.rule) {
 						os.d++
 						ss[i].add(&os)
 					}
 				})
-			} else if next := s.next(); next.term { // scan
-				if i < len(tokens) && s.nextIs(tokens[i]) {
-					s.d++
-					ss[i+1].add(&s)
-				}
+			} else if s.expect(scanner.token().rule) { // scan
+				s.d++
+				ss[i+1].add(&s)
 			} else { // predict
+				next := s.next()
 				for _, alt := range next.alts {
-					ss[i].add(&state{next.id, next.term, alt, i, 0})
+					ss[i].add(&state{next, alt, i, 0})
 				}
 			}
 		})
 		fmt.Println("r:", ss[i].expr())
+		i++
 	}
-}
-
-func grammar() *rule {
-	T := &rule{id: "T", alts: alts{
-		{rules{term("1")}},
-		{rules{term("2")}},
-		{rules{term("3")}},
-		{rules{term("4")}},
-	}}
-
-	M := &rule{id: "M"}
-	M.alts = alts{
-		{rules{M, term("*"), T}},
-		{rules{T}},
-	}
-
-	S := &rule{id: "S"}
-	S.alts = alts{
-		{rules{S, term("+"), M}},
-		{rules{M}},
-	}
-
-	P := &rule{id: "P", alts: alts{{rules{S}}}}
-	return P
 }
