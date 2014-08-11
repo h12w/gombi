@@ -46,8 +46,8 @@ func main() {
 
 	P := &rule{name: "P", alts: alts{{rules{S, EOF}}}}
 
-	s0 := newStateSet()
-	s0.add(&state{P, P.alts[0], 0, 0})
+	s0 := &stateSet{}
+	s0.add(newState(P, 0))
 	ss := []*stateSet{s0}
 
 	scanner := newTestScanner([]token{
@@ -61,26 +61,49 @@ func main() {
 
 	i := 0
 	for scanner.scan() {
-		ss = append(ss, newStateSet())
-		ss[i].each(func(s state) {
-			if s.complete() { // complete
-				ss[s.i].each(func(os state) {
-					if os.expect(s.rule) {
-						os.d++
-						ss[i].add(&os)
-					}
-				})
-			} else if s.expect(scanner.token().rule) { // scan
-				s.d++
-				ss[i+1].add(&s)
-			} else { // predict
-				next := s.next()
-				for _, alt := range next.alts {
-					ss[i].add(&state{next, alt, i, 0})
-				}
-			}
+		ss = append(ss, &stateSet{})
+		ss[i].each(func(s *state) {
+			scanPredict(scanner.token(), ss, s, i)
 		})
-		fmt.Println("r:", ss[i].expr())
+		fmt.Printf("set(%d) -> %s\n", i, ss[i].expr())
 		i++
+	}
+
+	ss[i].a[0].traverse(func(s *state) {
+		fmt.Println(s.expr())
+	})
+}
+
+func scanPredict(token *token, ss []*stateSet, s *state, i int) {
+	if !s.complete() {
+		if ns, ok := s.scan(token); ok { // scan
+			if !ns.complete() || ns.rule.alts[0].last().name == "EOF" {
+				ss[i+1].add(ns)
+			}
+			complete(ss, ns, i+1) // complete
+		} else { // predict
+			predict(token, ss, s, i)
+		}
+	}
+}
+
+func complete(ss []*stateSet, s *state, i int) {
+	if s.complete() {
+		s.parents.each(func(parent *state) {
+			ns := parent.copy()
+			ns.addChild(s)
+			ns.d++
+			if !ns.complete() || ns.rule.alts[0].last().name == "EOF" {
+				ss[i].add(ns)
+			}
+			complete(ss, ns, i)
+		})
+	}
+}
+
+func predict(token *token, ss []*stateSet, s *state, i int) {
+	next := s.next()
+	for j := range next.alts {
+		ss[i].add(newState(next, j)).addParent(s)
 	}
 }

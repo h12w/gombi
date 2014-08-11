@@ -6,6 +6,7 @@ import (
 )
 
 type (
+	// rule is a BNF production rule
 	rule struct {
 		name string
 		alts
@@ -35,6 +36,13 @@ func (rs rules) expr() string {
 		ss[i] = rs[i].expr()
 	}
 	return strings.Join(ss, " ")
+}
+
+func (as alt) last() *rule {
+	if len(as.rules) > 0 {
+		return as.rules[len(as.rules)-1]
+	}
+	return nil
 }
 
 func (as alts) expr() string {
