@@ -1,4 +1,4 @@
-package main
+package parse
 
 import (
 	"fmt"
@@ -18,12 +18,18 @@ type (
 	alts  []*alt
 )
 
+var ruleEOF = term("EOF")
+
 func term(s string) *rule {
 	return &rule{name: s}
 }
 
 func (r *rule) expr() string {
 	return r.name
+}
+
+func (r *rule) isEOF() bool {
+	return r == ruleEOF
 }
 
 func (r *rule) def() string {
