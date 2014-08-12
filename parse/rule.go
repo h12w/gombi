@@ -1,10 +1,5 @@
 package parse
 
-import (
-	"fmt"
-	"strings"
-)
-
 type (
 	// rule is a BNF production rule
 	rule struct {
@@ -24,37 +19,13 @@ func term(s string) *rule {
 	return &rule{name: s}
 }
 
-func (r *rule) expr() string {
-	return r.name
-}
-
 func (r *rule) isEOF() bool {
 	return r == ruleEOF
 }
 
-func (r *rule) def() string {
-	return fmt.Sprintf("%s ::= %s", r.name, r.alts.expr())
-}
-
-func (rs rules) expr() string {
-	ss := make([]string, len(rs))
-	for i := range rs {
-		ss[i] = rs[i].expr()
-	}
-	return strings.Join(ss, " ")
-}
-
-func (as alt) last() *rule {
-	if len(as.rules) > 0 {
-		return as.rules[len(as.rules)-1]
+func (a alt) last() *rule {
+	if len(a.rules) > 0 {
+		return a.rules[len(a.rules)-1]
 	}
 	return nil
-}
-
-func (as alts) expr() string {
-	ss := make([]string, len(as))
-	for i := range as {
-		ss[i] = as[i].expr()
-	}
-	return strings.Join(ss, " | ")
 }

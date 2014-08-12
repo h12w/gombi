@@ -2,13 +2,13 @@ package parse
 
 import (
 	"fmt"
+	"strings"
 	"testing"
-)
 
-type token struct {
-	value string
-	*rule
-}
+	"github.com/hailiang/gspec/core"
+	exp "github.com/hailiang/gspec/expectation"
+	"github.com/hailiang/gspec/suite"
+)
 
 type testScanner struct {
 	tokens []token
@@ -28,45 +28,75 @@ func (s *testScanner) token() *token {
 	return &s.tokens[s.i]
 }
 
-func TestParse(t *testing.T) {
-	T := term("T")
-	Plus := term("+")
-	Mult := term("*")
+var _ = suite.Add(func(s core.S) {
+	describe, given, it := suite.Alias3("describe", "given", "it", s)
+	expect := exp.Alias(s.FailNow)
 
-	M := &rule{name: "M"}
-	M.alts = alts{
-		{rules{M, Mult, T}},
-		{rules{T}},
-	}
+	describe("the parser", func() {
+		given("a simple arithmetic grammar & sample input tokens", func() {
+			T := term("T")
+			Plus := term("+")
+			Mult := term("*")
 
-	S := &rule{name: "S"}
-	S.alts = alts{
-		{rules{S, Plus, M}},
-		{rules{M}},
-	}
+			M := &rule{name: "M"}
+			M.alts = alts{
+				{rules{M, Mult, T}},
+				{rules{T}},
+			}
 
-	P := &rule{name: "P", alts: alts{{rules{S, ruleEOF}}}}
+			S := &rule{name: "S"}
+			S.alts = alts{
+				{rules{S, Plus, M}},
+				{rules{M}},
+			}
 
-	ctx := newContext(P)
+			P := &rule{name: "P", alts: alts{{rules{S, ruleEOF}}}}
 
-	scanner := newTestScanner([]token{
-		{"2", T},
-		{"+", Plus},
-		{"3", T},
-		{"*", Mult},
-		{"4", T},
-		{"", ruleEOF},
-	})
+			scanner := newTestScanner([]token{
+				{"2", T},
+				{"+", Plus},
+				{"3", T},
+				{"*", Mult},
+				{"4", T},
+				{"", ruleEOF},
+			})
 
-	for scanner.scan() {
-		ctx.cur.each(func(s *state) {
-			ctx.scanPredict(scanner.token(), s)
+			it("can parses the tokens and generate a correct parse tree", func() {
+				ctx := newContext(P)
+
+				for scanner.scan() {
+					ctx.cur.each(func(s *state) {
+						ctx.scanPredict(s, newTermState(scanner.token()))
+					})
+					//fmt.Printf("set -> %s\n", ctx.cur.String())
+					ctx.shift()
+				}
+
+				output := "\n"
+				for _, s := range ctx.cur.a {
+					s.traverse(0, func(s *state, level int) {
+						output += fmt.Sprintf("%s%s\n", strings.Repeat("    ", level), s.expr())
+					})
+				}
+				expect(output).Equal(`
+P ::= S EOF•
+    S ::= S + M•
+        S ::= M•
+            M ::= T•
+                T ::= 2
+        + ::= +
+        M ::= M * T•
+            M ::= T•
+                T ::= 3
+            * ::= *
+            T ::= 4
+    EOF ::= 
+`)
+			})
 		})
-		fmt.Printf("set -> %s\n", ctx.cur.expr())
-		ctx.shift()
-	}
-
-	ctx.cur.a[0].traverse(func(s *state) {
-		fmt.Println(s.expr())
 	})
+})
+
+func TestAll(t *testing.T) {
+	suite.Test(t)
 }

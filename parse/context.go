@@ -5,45 +5,40 @@ type context struct {
 }
 
 func newContext(r *rule) *context {
-	cur, next := &stateSet{}, &stateSet{}
+	cur, next := newStateSet(), newStateSet()
 	cur.add(newState(r, 0))
 	return &context{cur, next}
 }
 
 func (c *context) shift() {
-	c.cur, c.next = c.next, &stateSet{}
+	c.cur, c.next = c.next, newStateSet()
 }
 
-func (ctx *context) scanPredict(token *token, s *state) {
-	if !s.complete() {
-		if ns, ok := s.scan(token); ok { // scan
-			if !ns.complete() || ns.last().isEOF() {
-				ctx.next.add(ns)
+func (ctx *context) scanPredict(s, t *state) {
+	if !ctx.next.scan(s, t) {
+		next := s.next()
+		for i := range next.alts {
+			child, isNew := ctx.cur.add(newState(next, i))
+			child.addParent(s)
+			if isNew {
+				ctx.scanPredict(child, t)
 			}
-			ctx.next.complete(ns) // complete
-		} else { // predict
-			ctx.cur.predict(token, s)
 		}
 	}
 }
 
-func (ss *stateSet) complete(s *state) {
-	if s.complete() {
-		s.parents.each(func(parent *state) {
-			ns := parent.copy()
-			ns.addChild(s)
-			ns.d++
-			if !ns.complete() || ns.last().isEOF() {
-				ss.add(ns)
-			}
-			ss.complete(ns)
-		})
+func (ss *stateSet) scan(s, t *state) bool {
+	if s.scan(t) { // scan
+		if s.complete() && !s.last().isEOF() {
+			s.parents.each(func(parent *state) {
+				// multiple alternatives shares the same parent, so it must be copied
+				ss.scan(parent.copy(), s)
+			})
+		} else {
+			// add only not completed states or the final result
+			ss.add(s)
+		}
+		return true
 	}
-}
-
-func (ss *stateSet) predict(token *token, s *state) {
-	next := s.next()
-	for j := range next.alts {
-		ss.add(newState(next, j)).addParent(s)
-	}
+	return false
 }
