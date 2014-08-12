@@ -22,6 +22,10 @@ func (r *R) isEOF() bool {
 	return r == EOF
 }
 
+func (r *R) isNull() bool {
+	return r == Null
+}
+
 func (r *R) eachAlt(visit func(r *R, a *Alt)) {
 	if r == nil {
 		return
@@ -36,4 +40,8 @@ func (a Alt) last() *R {
 		return a.Rs[len(a.Rs)-1]
 	}
 	return nil
+}
+
+func (a Alt) isNull() bool {
+	return len(a.Rs) == 1 && a.Rs[0].isNull()
 }

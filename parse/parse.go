@@ -42,10 +42,12 @@ func (ctx *Parser) scanPredict(s, t *state) {
 	}
 	if !ctx.next.scan(s, t) {
 		s.nextChildRule().eachAlt(func(r *R, alt *Alt) {
-			child, isNew := ctx.cur.add(newState(r, alt))
-			child.parents.add(s)
-			if isNew {
-				ctx.scanPredict(child, t)
+			if !alt.isNull() {
+				child, isNew := ctx.cur.add(newState(r, alt))
+				child.parents.add(s)
+				if isNew {
+					ctx.scanPredict(child, t)
+				}
 			}
 		})
 	}
