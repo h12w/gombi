@@ -2,35 +2,55 @@ package parse
 
 type token struct {
 	value string
-	*rule
+	*R
+}
+
+type matchingR struct {
+	*R
+	*Alt
+	d int // dot position
+}
+
+func (r *matchingR) nextChildR() *R {
+	return r.Alt.Rs[r.d]
+}
+
+func (r *matchingR) complete() bool {
+	return r.d == len(r.Alt.Rs)
+}
+
+func (r *matchingR) equal(o *state) bool {
+	return r.Alt == o.Alt && r.d == o.d
+}
+
+func (r *matchingR) expect(o *R) bool {
+	return !r.complete() && r.nextChildR() == o
 }
 
 type state struct {
-	*rule
-	*alt
-	d       int      // dot position
+	matchingR
 	parents stateSet // multiple alternatives (parents) may share a common prefix (child)
 	values  []*state
 	value   *string
 }
 
-func newState(r *rule, i int) *state {
+func newState(r *R, alt *Alt) *state {
 	return &state{
-		rule:    r,
-		alt:     r.alts[i],
+		matchingR: matchingR{
+			R:   r,
+			Alt: alt,
+		},
 		parents: *newStateSet(),
-		values:  make([]*state, len(r.alts[i].rules))}
+		values:  make([]*state, len(alt.Rs))}
 }
 
 func newTermState(t *token) *state {
 	return &state{
-		rule:    t.rule,
+		matchingR: matchingR{
+			R: t.R,
+		},
 		parents: *newStateSet(),
 		value:   &t.value}
-}
-
-func (s *state) addParent(parent *state) {
-	s.parents.add(parent)
 }
 
 func (s *state) copy() *state {
@@ -39,31 +59,15 @@ func (s *state) copy() *state {
 	return &c
 }
 
-func (s *state) equal(o *state) bool {
-	return s.alt == o.alt && s.d == o.d
-}
-
-func (s *state) complete() bool {
-	return s.d == len(s.alt.rules)
-}
-
-func (s *state) next() *rule {
-	return s.alt.rules[s.d]
-}
-
 // scan matches t with the expected input. If matched, it advances itself and
 // returns true, otherwise, returns false.
 func (s *state) scan(t *state) bool {
-	if s.expect(t.rule) {
+	if s.expect(t.R) {
 		s.values[s.d] = t
 		s.d++
 		return true
 	}
 	return false
-}
-
-func (s *state) expect(r *rule) bool {
-	return !s.complete() && s.alt.rules[s.d] == r
 }
 
 type stateSet struct {

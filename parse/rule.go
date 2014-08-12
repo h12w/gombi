@@ -1,31 +1,39 @@
 package parse
 
 type (
-	// rule is a BNF production rule
-	rule struct {
-		name string
-		alts
+	// R is a BNF production rule
+	R struct {
+		Name string
+		Alts
 	}
-	alt struct {
-		rules
+	Alt struct {
+		Rs
 	}
-	rules []*rule
-	alts  []*alt
+	Rs   []*R
+	Alts []*Alt
 )
 
-var ruleEOF = term("EOF")
+var (
+	EOF  = Rule("EOF")
+	Null = Rule("Null")
+)
 
-func term(s string) *rule {
-	return &rule{name: s}
+func (r *R) isEOF() bool {
+	return r == EOF
 }
 
-func (r *rule) isEOF() bool {
-	return r == ruleEOF
+func (r *R) eachAlt(visit func(r *R, a *Alt)) {
+	if r == nil {
+		return
+	}
+	for _, a := range r.Alts {
+		visit(r, a)
+	}
 }
 
-func (a alt) last() *rule {
-	if len(a.rules) > 0 {
-		return a.rules[len(a.rules)-1]
+func (a Alt) last() *R {
+	if len(a.Rs) > 0 {
+		return a.Rs[len(a.Rs)-1]
 	}
 	return nil
 }

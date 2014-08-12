@@ -4,9 +4,9 @@ type context struct {
 	cur, next *stateSet
 }
 
-func newContext(r *rule) *context {
+func newContext(r *R) *context {
 	cur, next := newStateSet(), newStateSet()
-	cur.add(newState(r, 0))
+	cur.add(newState(r, r.Alts[0])) // TODO: Alts[0] needs improvement
 	return &context{cur, next}
 }
 
@@ -16,14 +16,13 @@ func (c *context) shift() {
 
 func (ctx *context) scanPredict(s, t *state) {
 	if !ctx.next.scan(s, t) {
-		next := s.next()
-		for i := range next.alts {
-			child, isNew := ctx.cur.add(newState(next, i))
-			child.addParent(s)
+		s.nextChildR().eachAlt(func(r *R, alt *Alt) {
+			child, isNew := ctx.cur.add(newState(r, alt))
+			child.parents.add(s)
 			if isNew {
 				ctx.scanPredict(child, t)
 			}
-		}
+		})
 	}
 }
 

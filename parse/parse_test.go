@@ -34,23 +34,23 @@ var _ = suite.Add(func(s core.S) {
 
 	describe("the parser", func() {
 		given("a simple arithmetic grammar & sample input tokens", func() {
-			T := term("T")
-			Plus := term("+")
-			Mult := term("*")
+			T := Rule("T")
+			Plus := Rule("+")
+			Mult := Rule("*")
 
-			M := &rule{name: "M"}
-			M.alts = alts{
-				{rules{M, Mult, T}},
-				{rules{T}},
-			}
+			M := Rule("M")
+			M.Or(
+				Con(M, Mult, T),
+				T,
+			)
 
-			S := &rule{name: "S"}
-			S.alts = alts{
-				{rules{S, Plus, M}},
-				{rules{M}},
-			}
+			S := Rule("S")
+			S.Or(
+				Con(S, Plus, M),
+				M,
+			)
 
-			P := &rule{name: "P", alts: alts{{rules{S, ruleEOF}}}}
+			P := Rule("P").Con(S, EOF)
 
 			scanner := newTestScanner([]token{
 				{"2", T},
@@ -58,7 +58,7 @@ var _ = suite.Add(func(s core.S) {
 				{"3", T},
 				{"*", Mult},
 				{"4", T},
-				{"", ruleEOF},
+				{"", EOF},
 			})
 
 			it("can parses the tokens and generate a correct parse tree", func() {
