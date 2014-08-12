@@ -1,42 +1,50 @@
 package parse
 
-type token struct {
-	value string
-	*R
-}
-
-type matchingR struct {
+type matchingRule struct {
 	*R
 	*Alt
 	d int // dot position
 }
 
-func (r *matchingR) nextChildR() *R {
-	return r.Alt.Rs[r.d]
+func (r *matchingRule) nextChildRule() *R {
+	if r.d < len(r.Alt.Rs) {
+		return r.Alt.Rs[r.d]
+	}
+	return nil
 }
 
-func (r *matchingR) complete() bool {
+func (r *matchingRule) nextIsNullable() (result bool) {
+	next := r.nextChildRule()
+	next.eachAlt(func(r *R, alt *Alt) {
+		if len(alt.Rs) == 1 && alt.Rs[0] == Null {
+			result = true
+		}
+	})
+	return result
+}
+
+func (r *matchingRule) complete() bool {
 	return r.d == len(r.Alt.Rs)
 }
 
-func (r *matchingR) equal(o *state) bool {
+func (r *matchingRule) equal(o *state) bool {
 	return r.Alt == o.Alt && r.d == o.d
 }
 
-func (r *matchingR) expect(o *R) bool {
-	return !r.complete() && r.nextChildR() == o
+func (r *matchingRule) expect(o *R) bool {
+	return !r.complete() && r.nextChildRule() == o
 }
 
 type state struct {
-	matchingR
+	matchingRule
 	parents stateSet // multiple alternatives (parents) may share a common prefix (child)
 	values  []*state
-	value   *string
+	value   interface{}
 }
 
 func newState(r *R, alt *Alt) *state {
 	return &state{
-		matchingR: matchingR{
+		matchingRule: matchingRule{
 			R:   r,
 			Alt: alt,
 		},
@@ -44,13 +52,13 @@ func newState(r *R, alt *Alt) *state {
 		values:  make([]*state, len(alt.Rs))}
 }
 
-func newTermState(t *token) *state {
+func newTermState(t *Token) *state {
 	return &state{
-		matchingR: matchingR{
+		matchingRule: matchingRule{
 			R: t.R,
 		},
 		parents: *newStateSet(),
-		value:   &t.value}
+		value:   t.Value}
 }
 
 func (s *state) copy() *state {

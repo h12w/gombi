@@ -1,8 +1,6 @@
 package parse
 
 import (
-	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/hailiang/gspec/core"
@@ -11,21 +9,21 @@ import (
 )
 
 type testScanner struct {
-	tokens []token
+	tokens []*Token
 	i      int
 }
 
-func newTestScanner(tokens []token) *testScanner {
+func newTestScanner(tokens []*Token) *testScanner {
 	return &testScanner{tokens: tokens, i: -1}
 }
 
-func (s *testScanner) scan() bool {
+func (s *testScanner) Scan() bool {
 	s.i++
 	return s.i < len(s.tokens)
 }
 
-func (s *testScanner) token() *token {
-	return &s.tokens[s.i]
+func (s *testScanner) Token() *Token {
+	return s.tokens[s.i]
 }
 
 var _ = suite.Add(func(s core.S) {
@@ -33,26 +31,25 @@ var _ = suite.Add(func(s core.S) {
 	expect := exp.Alias(s.FailNow)
 
 	describe("the parser", func() {
-		given("a simple arithmetic grammar & sample input tokens", func() {
+
+		given("a parser of simple arithmetic grammar & input tokens", func() {
 			T := Rule("T")
 			Plus := Rule("+")
 			Mult := Rule("*")
-
 			M := Rule("M")
 			M.Or(
 				Con(M, Mult, T),
 				T,
 			)
-
 			S := Rule("S")
 			S.Or(
 				Con(S, Plus, M),
 				M,
 			)
-
 			P := Rule("P").Con(S, EOF)
+			parser := NewParser(P)
 
-			scanner := newTestScanner([]token{
+			scanner := newTestScanner([]*Token{
 				{"2", T},
 				{"+", Plus},
 				{"3", T},
@@ -61,24 +58,13 @@ var _ = suite.Add(func(s core.S) {
 				{"", EOF},
 			})
 
-			it("can parses the tokens and generate a correct parse tree", func() {
-				ctx := newContext(P)
-
-				for scanner.scan() {
-					ctx.cur.each(func(s *state) {
-						ctx.scanPredict(s, newTermState(scanner.token()))
-					})
-					//fmt.Printf("set -> %s\n", ctx.cur.String())
-					ctx.shift()
+			it("can parse the tokens and generate a correct parse tree", func() {
+				for scanner.Scan() {
+					parser.Parse(scanner.Token())
 				}
-
-				output := "\n"
-				for _, s := range ctx.cur.a {
-					s.traverse(0, func(s *state, level int) {
-						output += fmt.Sprintf("%s%s\n", strings.Repeat("    ", level), s.expr())
-					})
-				}
-				expect(output).Equal(`
+				result := parser.Result()
+				expect(result).NotEqual(nil)
+				expect(result.String()).Equal(`
 P ::= S EOF•
     S ::= S + M•
         S ::= M•
@@ -93,6 +79,59 @@ P ::= S EOF•
     EOF ::= 
 `)
 			})
+		})
+
+		given("a grammar with nullable rule", func() {
+			A := Rule("A")
+			B := Rule("B")
+			X := Rule("X").Or(B, Null)
+			C := Rule("C")
+
+			P := Rule("P").Con(A, X, C, EOF)
+
+			given("a sequence without the optional token", func() {
+				scanner := newTestScanner([]*Token{
+					{"A", A},
+					{"C", C},
+					{"EOF", EOF},
+				})
+				parser := NewParser(P)
+				for scanner.Scan() {
+					parser.Parse(scanner.Token())
+				}
+				result := parser.Result()
+				expect(result).NotEqual(nil)
+				expect(result.String()).Equal(`
+P ::= A X C EOF•
+    A ::= A
+    C ::= C
+    EOF ::= EOF
+`)
+			})
+
+			given("a sequence with the optional token", func() {
+				scanner := newTestScanner([]*Token{
+					{"A", A},
+					{"B", B},
+					{"C", C},
+					{"EOF", EOF},
+				})
+				parser := NewParser(P)
+				for scanner.Scan() {
+					parser.Parse(scanner.Token())
+				}
+				result := parser.Result()
+				expect(result).NotEqual(nil)
+				expect(result.String()).Equal(`
+P ::= A X C EOF•
+    A ::= A
+    X ::= B•
+        B ::= B
+    C ::= C
+    EOF ::= EOF
+`)
+			})
+
 		})
 	})
 })
