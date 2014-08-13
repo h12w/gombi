@@ -33,23 +33,20 @@ var _ = suite.Add(func(s core.S) {
 	describe("the parser", func() {
 
 		testcase("simple arithmetic grammar", func() {
-			T := Rule("T")
-			Plus := Rule("+")
-			Mult := Rule("*")
-			M := Rule("M")
-			M.Is(
-				Or(
-					Con(M, Mult, T),
+			var (
+				T    = Term("T")
+				Plus = Term("+")
+				Mult = Term("*")
+				M    = Rule("M", Or(
+					Con(Self, Mult, T),
 					T,
 				))
-			S := Rule("S")
-			S.Is(
-				Or(
-					Con(S, Plus, M),
+				S = Rule("S", Or(
+					Con(Self, Plus, M),
 					M,
 				))
-			P := Rule("P").Is(S)
-
+				P = Rule("P", S)
+			)
 			testParse(s, P, []*Token{
 				{"2", T},
 				{"+", Plus},
@@ -73,11 +70,11 @@ var _ = suite.Add(func(s core.S) {
 		})
 
 		describe("a parser with nullable rule", func() {
-			A := Rule("A")
-			B := Rule("B")
-			X := Rule("X").Is(B.ZeroOrOne())
-			C := Rule("C")
-			P := Rule("P").Is(A, X, C)
+			A := Term("A")
+			B := Term("B")
+			X := Rule("X", B.ZeroOrOne())
+			C := Term("C")
+			P := Rule("P", A, X, C)
 
 			testcase("a sequence without the optional token", func() {
 				testParse(s, P, []*Token{
@@ -109,9 +106,9 @@ var _ = suite.Add(func(s core.S) {
 		})
 
 		testcase("a trivial but valid nullable rule", func() {
-			A := Rule("A")
-			C := Rule("C")
-			P := Rule("P").Is(A, Null, C)
+			A := Term("A")
+			C := Term("C")
+			P := Rule("P", A, Null, C)
 			testParse(s, P, []*Token{
 				{"A", A},
 				{"C", C},
@@ -124,12 +121,11 @@ var _ = suite.Add(func(s core.S) {
 		})
 
 		testcase("a case of zero or more repetition", func() {
-			A := Rule("A")
-			B := Rule("B")
-			X := B.ZeroOrMore()
-			X.Name = "X"
-			C := Rule("C")
-			P := Rule("P").Is(A, X, C)
+			A := Term("A")
+			B := Term("B")
+			X := Rule("X", B.ZeroOrMore())
+			C := Term("C")
+			P := Rule("P", A, X, C)
 			testParse(s, P, []*Token{
 				{"A", A},
 				{"C", C},

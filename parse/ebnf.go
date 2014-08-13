@@ -1,7 +1,19 @@
 package parse
 
-func Rule(name string) *R {
+func Term(name string) *R {
 	return &R{Name: name}
+}
+
+func Rule(name string, rules ...*R) *R {
+	r := Con(rules...).As(name)
+	r.traverseAlt(make(map[*R]bool), func(a *Alt) {
+		for i := range a.Rs {
+			if a.Rs[i] == Self {
+				a.Rs[i] = r
+			}
+		}
+	})
+	return r
 }
 
 func Con(rules ...*R) *R {
@@ -22,9 +34,8 @@ func Or(rules ...*R) *R {
 	return &R{"", alts}
 }
 
-func (r *R) Is(rules ...*R) *R {
-	r.Alts = Con(rules...).Alts
-	//fmt.Println(rules, Con(rules...), r)
+func (r *R) As(name string) *R {
+	r.Name = name
 	return r
 }
 
@@ -33,8 +44,8 @@ func (r *R) ZeroOrOne() *R {
 }
 
 func (r *R) ZeroOrMore() *R {
-	x := Rule("")
-	x.Is(Con(x, r).ZeroOrOne())
+	x := &R{}
+	x.Alts = Con(x, r).ZeroOrOne().Alts
 	return x
 }
 

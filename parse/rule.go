@@ -14,8 +14,9 @@ type (
 )
 
 var (
-	EOF  = Rule("EOF")
-	Null = Rule("Null")
+	EOF  = Term("EOF")
+	Null = Term("Null")
+	Self = Term("Self")
 )
 
 func (r *R) isEOF() bool {
@@ -27,11 +28,20 @@ func (r *R) isNull() bool {
 }
 
 func (r *R) eachAlt(visit func(r *R, a *Alt)) {
-	if r == nil {
-		return
-	}
 	for _, a := range r.Alts {
 		visit(r, a)
+	}
+}
+
+func (r *R) traverseAlt(m map[*R]bool, visit func(*Alt)) {
+	m[r] = true
+	for _, a := range r.Alts {
+		visit(a)
+		for _, rule := range a.Rs {
+			if !m[r] {
+				rule.traverseAlt(m, visit)
+			}
+		}
 	}
 }
 
