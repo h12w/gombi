@@ -5,7 +5,9 @@ func Term(name string) *R {
 }
 
 func Rule(name string, rules ...*R) *R {
-	r := Con(rules...).As(name)
+	return Con(rules...).initRecursiveRule().As(name)
+}
+func (r *R) initRecursiveRule() *R {
 	r.traverseAlt(make(map[*R]bool), func(a *Alt) {
 		for i := range a.Rs {
 			if a.Rs[i] == Self {
@@ -33,6 +35,12 @@ func Or(rules ...*R) *R {
 	}
 	return &R{"", alts}
 }
+func (r *R) toAlt() *Alt {
+	if len(r.Alts) == 1 {
+		return &Alt{r.Alts[0].Rs}
+	}
+	return &Alt{Rs{r}}
+}
 
 func (r *R) As(name string) *R {
 	r.Name = name
@@ -47,15 +55,4 @@ func (r *R) ZeroOrMore() *R {
 	x := &R{}
 	x.Alts = Con(x, r).ZeroOrOne().Alts
 	return x
-}
-
-func (r *R) toAlt() *Alt {
-	if len(r.Alts) == 1 {
-		return &Alt{r.Alts[0].Rs}
-	}
-	return &Alt{Rs{r}}
-}
-
-func (r *R) toAlts() Alts {
-	return r.Alts
 }
