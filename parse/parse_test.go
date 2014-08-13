@@ -1,6 +1,7 @@
 package parse
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/hailiang/gspec/core"
@@ -36,16 +37,18 @@ var _ = suite.Add(func(s core.S) {
 			Plus := Rule("+")
 			Mult := Rule("*")
 			M := Rule("M")
-			M.Or(
-				Con(M, Mult, T),
-				T,
-			)
+			M.Is(
+				Or(
+					Con(M, Mult, T),
+					T,
+				))
 			S := Rule("S")
-			S.Or(
-				Con(S, Plus, M),
-				M,
-			)
-			P := Rule("P").Con(S, EOF)
+			S.Is(
+				Or(
+					Con(S, Plus, M),
+					M,
+				))
+			P := Rule("P").Is(S)
 
 			testParse(s, P, []*Token{
 				{"2", T},
@@ -55,27 +58,26 @@ var _ = suite.Add(func(s core.S) {
 				{"4", T},
 				{"", EOF},
 			}, `
-P ::= S EOF•
-    S ::= S + M•
-        S ::= M•
-            M ::= T•
-                T ::= 2
-        + ::= +
-        M ::= M * T•
-            M ::= T•
-                T ::= 3
-            * ::= *
-            T ::= 4
-    EOF ::= 
-`)
+			P ::= S EOF•
+			    S ::= S + M•
+			        S ::= M•
+			            M ::= T•
+			                T ::= 2
+			        + ::= +
+			        M ::= M * T•
+			            M ::= T•
+			                T ::= 3
+			            * ::= *
+			            T ::= 4
+			    EOF ::= `)
 		})
 
 		describe("a parser with nullable rule", func() {
 			A := Rule("A")
 			B := Rule("B")
-			X := Rule("X").Or(B, Null)
+			X := Rule("X").Is(B.ZeroOrOne())
 			C := Rule("C")
-			P := Rule("P").Con(A, X, C, EOF)
+			P := Rule("P").Is(A, X, C)
 
 			testcase("a sequence without the optional token", func() {
 				testParse(s, P, []*Token{
@@ -83,11 +85,10 @@ P ::= S EOF•
 					{"C", C},
 					{"EOF", EOF},
 				}, `
-P ::= A X C EOF•
-    A ::= A
-    C ::= C
-    EOF ::= EOF
-`,
+				P ::= A X C EOF•
+				    A ::= A
+				    C ::= C
+				    EOF ::= EOF`,
 				)
 			})
 
@@ -98,30 +99,70 @@ P ::= A X C EOF•
 					{"C", C},
 					{"EOF", EOF},
 				}, `
-P ::= A X C EOF•
-    A ::= A
-    X ::= B•
-        B ::= B
-    C ::= C
-    EOF ::= EOF
-`)
+				P ::= A X C EOF•
+				    A ::= A
+				    X ::= B•
+				        B ::= B
+				    C ::= C
+				    EOF ::= EOF`)
 			})
 		})
 
 		testcase("a trivial but valid nullable rule", func() {
 			A := Rule("A")
 			C := Rule("C")
-			P := Rule("P").Con(A, Null, C, EOF)
+			P := Rule("P").Is(A, Null, C)
 			testParse(s, P, []*Token{
 				{"A", A},
 				{"C", C},
 				{"EOF", EOF},
 			}, `
-P ::= A Null C EOF•
-    A ::= A
-    C ::= C
-    EOF ::= EOF
-`)
+			P ::= A Null C EOF•
+			    A ::= A
+			    C ::= C
+			    EOF ::= EOF`)
+		})
+
+		testcase("a case of zero or more repetition", func() {
+			A := Rule("A")
+			B := Rule("B")
+			X := B.ZeroOrMore()
+			X.Name = "X"
+			C := Rule("C")
+			P := Rule("P").Is(A, X, C)
+			testParse(s, P, []*Token{
+				{"A", A},
+				{"C", C},
+			}, `
+			P ::= A X C•EOF
+			    A ::= A
+			    C ::= C`)
+
+			testParse(s, P, []*Token{
+				{"A", A},
+				{"B", B},
+				{"C", C},
+			}, `
+			P ::= A X C•EOF
+			    A ::= A
+			    X ::= X B•
+			        B ::= B
+			    C ::= C`)
+
+			testParse(s, P, []*Token{
+				{"A", A},
+				{"B", B},
+				{"B", B},
+				{"C", C},
+			}, `
+			P ::= A X C•EOF
+			    A ::= A
+			    X ::= X B•
+			        X ::= X B•
+			            B ::= B
+			        B ::= B
+			    C ::= C`)
+
 		})
 	})
 })
@@ -139,5 +180,30 @@ func testParse(s core.S, P *R, tokens []*Token, expected string) {
 	}
 	result := parser.Result()
 	expect(result).NotEqual(nil)
-	expect(result.String()).Equal(expected)
+	expect(result.String()).Equal(unindent(expected))
+}
+
+func unindent(s string) string {
+	lines := strings.Split(s, "\n")
+	indent := ""
+	done := false
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			for _, r := range line {
+				if r == ' ' || r == '\t' {
+					indent += string(r)
+				} else {
+					done = true
+					break
+				}
+			}
+		}
+		if done {
+			break
+		}
+	}
+	for i := range lines {
+		lines[i] = strings.TrimPrefix(lines[i], indent)
+	}
+	return strings.Join(lines, "\n")
 }

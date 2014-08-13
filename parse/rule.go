@@ -45,3 +45,11 @@ func (a Alt) last() *R {
 func (a Alt) isNull() bool {
 	return len(a.Rs) == 1 && a.Rs[0].isNull()
 }
+
+func (r *R) appendEOF() {
+	for _, a := range r.Alts {
+		if a.last() != EOF {
+			a.Rs = append(a.Rs, EOF)
+		}
+	}
+}

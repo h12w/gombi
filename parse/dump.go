@@ -62,5 +62,5 @@ func (n *Node) String() string {
 	n.traverse(0, func(s *state, level int) {
 		output += fmt.Sprintf("%s%s\n", strings.Repeat("    ", level), s.expr())
 	})
-	return output
+	return strings.TrimSuffix(output, "\n")
 }

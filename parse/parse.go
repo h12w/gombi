@@ -10,6 +10,7 @@ type Parser struct {
 }
 
 func NewParser(r *R) *Parser {
+	r.appendEOF()
 	cur, next := newStateSet(), newStateSet()
 	// TODO: detect and add EOF
 	cur.add(newState(r, r.Alts[0])) // TODO: Alts[0] needs improvement
