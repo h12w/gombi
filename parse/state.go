@@ -1,24 +1,25 @@
 package parse
 
 type matchingRule struct {
-	*R
 	*Alt
-	d int // dot position
+	values []*state
+	value  interface{}
+	d      int // dot position
 }
 
 func (r *matchingRule) nextChildRule() *R {
-	if r.d < len(r.Alt.Rs) {
-		if r.Alt.Rs[r.d] == Null {
+	if r.d < len(r.Alt.Rules) {
+		if r.Alt.Rules[r.d] == Null {
 			r.d++ // skip trivial null rule
 			return r.nextChildRule()
 		}
-		return r.Alt.Rs[r.d]
+		return r.Alt.Rules[r.d]
 	}
 	return nil
 }
 
 func (r *matchingRule) complete() bool {
-	return r.d == len(r.Alt.Rs)
+	return r.d == len(r.Alt.Rules)
 }
 
 func (r *matchingRule) equal(o *state) bool {
@@ -31,28 +32,28 @@ func (r *matchingRule) expect(o *R) bool {
 
 type state struct {
 	matchingRule
-	parents stateSet // multiple alternatives (parents) may share a common prefix (child)
-	values  []*state
-	value   interface{}
+	parents *stateSet // multiple alternatives (parents) may share a common prefix (child)
 }
 
-func newState(r *R, alt *Alt) *state {
+func newState(alt *Alt) *state {
 	return &state{
 		matchingRule: matchingRule{
-			R:   r,
-			Alt: alt,
+			Alt:    alt,
+			values: make([]*state, len(alt.Rules)),
 		},
-		parents: *newStateSet(),
-		values:  make([]*state, len(alt.Rs))}
+		parents: newStateSet(nil),
+	}
 }
 
+// newTermState intializes a parsed state for a terminal rule from a token.
 func newTermState(t *Token) *state {
 	return &state{
 		matchingRule: matchingRule{
-			R: t.R,
+			Alt:   &Alt{Parent: t.R},
+			d:     1,
+			value: t.Value,
 		},
-		parents: *newStateSet(),
-		value:   t.Value}
+		parents: newStateSet(nil)}
 }
 
 func (s *state) copy() *state {
@@ -61,37 +62,58 @@ func (s *state) copy() *state {
 	return &c
 }
 
+func (s *state) step() *state {
+	s.d++
+	return s
+}
+
 // scan matches t with the expected input. If matched, it advances itself and
 // returns true, otherwise, returns false.
 func (s *state) scan(t *state) bool {
-	if s.expect(t.R) {
+	if s.expect(t.rule()) {
 		s.values[s.d] = t
-		s.d++
+		s.step()
 		return true
 	}
 	return false
+}
+func (a *Alt) rule() *R {
+	return a.Parent
 }
 
 type stateSet struct {
 	a []*state
 }
 
-func newStateSet() *stateSet {
-	return &stateSet{}
+func newStateSet(r *R) *stateSet {
+	ss := &stateSet{}
+	if r != nil {
+		r.eachAlt(func(a *Alt) {
+			ss.add(newState(a), nil)
+		})
+	}
+	return ss
 }
 
-func (ss *stateSet) empty() bool {
-	return len(ss.a) == 0
+func (ss *stateSet) add(o, parent *state) (isNew bool) {
+	if s, ok := ss.find(o); ok {
+		o = s
+	} else {
+		ss.a = append(ss.a, o)
+		isNew = true
+	}
+	if parent != nil {
+		o.parents.add(parent, nil)
+	}
+	return
 }
-
-func (ss *stateSet) add(o *state) (*state, bool) {
+func (ss *stateSet) find(o *state) (*state, bool) {
 	for _, s := range ss.a {
 		if s.equal(o) {
-			return s, false
+			return s, true
 		}
 	}
-	ss.a = append(ss.a, o)
-	return o, true
+	return nil, false
 }
 
 func (ss *stateSet) each(visit func(*state)) {

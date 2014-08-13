@@ -10,11 +10,17 @@ type Parser struct {
 }
 
 func NewParser(r *R) *Parser {
-	r.appendEOF()
-	cur, next := newStateSet(), newStateSet()
-	// TODO: detect and add EOF
-	cur.add(newState(r, r.Alts[0])) // TODO: Alts[0] needs improvement
-	return &Parser{cur, next}
+	return &Parser{
+		newStateSet(r.appendEOF()),
+		newStateSet(nil)}
+}
+func (r *R) appendEOF() *R {
+	for _, a := range r.Alts {
+		if a.last() != EOF {
+			a.Rules = append(a.Rules, EOF)
+		}
+	}
+	return r
 }
 
 func (p *Parser) Parse(token *Token) {
@@ -24,55 +30,41 @@ func (p *Parser) Parse(token *Token) {
 	//fmt.Printf("set -> %s\n", p.cur.String())
 	p.shift()
 }
+func (c *Parser) shift() {
+	c.cur, c.next = c.next, newStateSet(nil)
+}
+
+func (ctx *Parser) scanPredict(s, t *state) {
+	if !ctx.next.scan(s, t) {
+		s.nextChildRule().eachAlt(func(alt *Alt) {
+			if alt.isNull() {
+				// copied because other alternatives should not be skipped
+				ctx.scanPredict(s.copy().step(), t)
+			} else if child := newState(alt); ctx.cur.add(child, s) {
+				ctx.scanPredict(child, t)
+			}
+		})
+	}
+}
+
+func (ss *stateSet) scan(s, t *state) bool {
+	if s.scan(t) {
+		if s.complete() && !s.last().isEOF() {
+			s.parents.each(func(parent *state) {
+				// copied because multiple alternatives shares the same parent
+				ss.scan(parent.copy(), s)
+			})
+		} else {
+			ss.add(s, nil)
+		}
+		return true
+	}
+	return false
+}
 
 func (p *Parser) Result() *Node {
 	if len(p.cur.a) > 0 {
 		return &Node{p.cur.a[0]}
 	}
 	return nil
-}
-
-func (c *Parser) shift() {
-	c.cur, c.next = c.next, newStateSet()
-}
-
-func (ctx *Parser) scanPredict(s, t *state) {
-	if !ctx.next.scan(s, t) {
-		s.nextChildRule().eachAlt(func(r *R, alt *Alt) {
-			if alt.isNull() {
-				ns := s.copy()
-				ns.d++
-				ctx.scanPredict(ns, t)
-			} else {
-				child, isNew := ctx.cur.add(newState(r, alt))
-				child.parents.add(s)
-				if isNew {
-					ctx.scanPredict(child, t)
-				}
-			}
-		})
-	}
-}
-
-func (ss *stateSet) scanNull(s, t *state) bool {
-	if s.R == Null {
-		ss.scan(s, newTermState(&Token{R: Null}))
-	}
-	return ss.scan(s, t)
-}
-
-func (ss *stateSet) scan(s, t *state) bool {
-	if s.scan(t) { // scan
-		if s.complete() && !s.last().isEOF() {
-			s.parents.each(func(parent *state) {
-				// multiple alternatives shares the same parent, so it must be copied
-				ss.scan(parent.copy(), s)
-			})
-		} else {
-			// add only not completed states or the final result
-			ss.add(s)
-		}
-		return true
-	}
-	return false
 }

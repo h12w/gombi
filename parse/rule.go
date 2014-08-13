@@ -7,10 +7,11 @@ type (
 		Alts
 	}
 	Alt struct {
-		Rs
+		Parent *R
+		Rules
 	}
-	Rs   []*R
-	Alts []*Alt
+	Rules []*R
+	Alts  []*Alt
 )
 
 var (
@@ -27,9 +28,9 @@ func (r *R) isNull() bool {
 	return r == Null
 }
 
-func (r *R) eachAlt(visit func(r *R, a *Alt)) {
+func (r *R) eachAlt(visit func(a *Alt)) {
 	for _, a := range r.Alts {
-		visit(r, a)
+		visit(a)
 	}
 }
 
@@ -37,7 +38,7 @@ func (r *R) traverseAlt(m map[*R]bool, visit func(*Alt)) {
 	m[r] = true
 	for _, a := range r.Alts {
 		visit(a)
-		for _, rule := range a.Rs {
+		for _, rule := range a.Rules {
 			if !m[r] {
 				rule.traverseAlt(m, visit)
 			}
@@ -46,20 +47,12 @@ func (r *R) traverseAlt(m map[*R]bool, visit func(*Alt)) {
 }
 
 func (a Alt) last() *R {
-	if len(a.Rs) > 0 {
-		return a.Rs[len(a.Rs)-1]
+	if len(a.Rules) > 0 {
+		return a.Rules[len(a.Rules)-1]
 	}
 	return nil
 }
 
 func (a Alt) isNull() bool {
-	return len(a.Rs) == 1 && a.Rs[0].isNull()
-}
-
-func (r *R) appendEOF() {
-	for _, a := range r.Alts {
-		if a.last() != EOF {
-			a.Rs = append(a.Rs, EOF)
-		}
-	}
+	return len(a.Rules) == 1 && a.Rules[0].isNull()
 }

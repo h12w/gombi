@@ -53,39 +53,39 @@ var _ = suite.Add(func(s core.S) {
 				{"3", T},
 				{"*", Mult},
 				{"4", T},
-				{"", EOF},
 			}, `
 			P ::= S EOF•
-			    S ::= S + M•
-			        S ::= M•
-			            M ::= T•
-			                T ::= 2
-			        + ::= +
-			        M ::= M * T•
-			            M ::= T•
-			                T ::= 3
-			            * ::= *
-			            T ::= 4
-			    EOF ::= `)
+				S ::= S + M•
+					S ::= M•
+						M ::= T•
+							T ::= 2•
+					+ ::= +•
+					M ::= M * T•
+						M ::= T•
+							T ::= 3•
+						* ::= *•
+						T ::= 4•
+				EOF ::= •`)
 		})
 
 		describe("a parser with nullable rule", func() {
-			A := Term("A")
-			B := Term("B")
-			X := Rule("X", B.ZeroOrOne())
-			C := Term("C")
-			P := Rule("P", A, X, C)
+			var (
+				A = Term("A")
+				B = Term("B")
+				X = Rule("X", B.ZeroOrOne())
+				C = Term("C")
+				P = Rule("P", A, X, C)
+			)
 
 			testcase("a sequence without the optional token", func() {
 				testParse(s, P, []*Token{
 					{"A", A},
 					{"C", C},
-					{"EOF", EOF},
 				}, `
 				P ::= A X C EOF•
-				    A ::= A
-				    C ::= C
-				    EOF ::= EOF`,
+					A ::= A•
+					C ::= C•
+					EOF ::= •`,
 				)
 			})
 
@@ -94,56 +94,60 @@ var _ = suite.Add(func(s core.S) {
 					{"A", A},
 					{"B", B},
 					{"C", C},
-					{"EOF", EOF},
 				}, `
 				P ::= A X C EOF•
-				    A ::= A
-				    X ::= B•
-				        B ::= B
-				    C ::= C
-				    EOF ::= EOF`)
+					A ::= A•
+					X ::= B•
+						B ::= B•
+					C ::= C•
+					EOF ::= •`)
 			})
 		})
 
 		testcase("a trivial but valid nullable rule", func() {
-			A := Term("A")
-			C := Term("C")
-			P := Rule("P", A, Null, C)
+			var (
+				A = Term("A")
+				C = Term("C")
+				P = Rule("P", A, Null, C)
+			)
 			testParse(s, P, []*Token{
 				{"A", A},
 				{"C", C},
-				{"EOF", EOF},
 			}, `
 			P ::= A Null C EOF•
-			    A ::= A
-			    C ::= C
-			    EOF ::= EOF`)
+				A ::= A•
+				C ::= C•
+				EOF ::= •`)
 		})
 
 		testcase("a case of zero or more repetition", func() {
-			A := Term("A")
-			B := Term("B")
-			X := Rule("X", B.ZeroOrMore())
-			C := Term("C")
-			P := Rule("P", A, X, C)
+			var (
+				A = Term("A")
+				B = Term("B")
+				X = Rule("X", B.ZeroOrMore())
+				C = Term("C")
+				P = Rule("P", A, X, C)
+			)
 			testParse(s, P, []*Token{
 				{"A", A},
 				{"C", C},
 			}, `
-			P ::= A X C•EOF
-			    A ::= A
-			    C ::= C`)
+			P ::= A X C EOF•
+				A ::= A•
+				C ::= C•
+				EOF ::= •`)
 
 			testParse(s, P, []*Token{
 				{"A", A},
 				{"B", B},
 				{"C", C},
 			}, `
-			P ::= A X C•EOF
-			    A ::= A
-			    X ::= X B•
-			        B ::= B
-			    C ::= C`)
+			P ::= A X C EOF•
+				A ::= A•
+				X ::= X B•
+					B ::= B•
+				C ::= C•
+				EOF ::= •`)
 
 			testParse(s, P, []*Token{
 				{"A", A},
@@ -151,14 +155,14 @@ var _ = suite.Add(func(s core.S) {
 				{"B", B},
 				{"C", C},
 			}, `
-			P ::= A X C•EOF
-			    A ::= A
-			    X ::= X B•
-			        X ::= X B•
-			            B ::= B
-			        B ::= B
-			    C ::= C`)
-
+			P ::= A X C EOF•
+				A ::= A•
+				X ::= X B•
+					X ::= X B•
+						B ::= B•
+					B ::= B•
+				C ::= C•
+				EOF ::= •`)
 		})
 	})
 })
@@ -169,7 +173,7 @@ func TestAll(t *testing.T) {
 
 func testParse(s core.S, P *R, tokens []*Token, expected string) {
 	expect := exp.Alias(s.FailNow, 1)
-	scanner := newTestScanner(tokens)
+	scanner := newTestScanner(append(tokens, &Token{"", EOF}))
 	parser := NewParser(P)
 	for scanner.Scan() {
 		parser.Parse(scanner.Token())

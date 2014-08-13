@@ -13,7 +13,7 @@ func (r *R) String() string {
 	return fmt.Sprintf("%s ::= %s", r.Name, r.Alts.expr())
 }
 
-func (rs Rs) expr() string {
+func (rs Rules) expr() string {
 	ss := make([]string, len(rs))
 	for i := range rs {
 		ss[i] = rs[i].expr()
@@ -29,14 +29,19 @@ func (as Alts) expr() string {
 	return strings.Join(ss, " | ")
 }
 
+func (s *state) name() string {
+	return s.Alt.Parent.Name
+}
+
 func (s *state) expr() string {
-	if s == nil {
-		return ""
-	}
 	if s.value != nil {
-		return fmt.Sprintf("%s ::= %v", s.Name, s.value)
+		if s.d == 0 {
+			return fmt.Sprintf("%s ::= •%v", s.name(), s.value)
+		} else if s.d == 1 {
+			return fmt.Sprintf("%s ::= %v•", s.name(), s.value)
+		}
 	}
-	return fmt.Sprintf("%s ::= %v•%v", s.Name, s.Alt.Rs[:s.d].expr(), s.Alt.Rs[s.d:].expr())
+	return fmt.Sprintf("%s ::= %v•%v", s.name(), s.Alt.Rules[:s.d].expr(), s.Alt.Rules[s.d:].expr())
 }
 
 func (s *state) traverse(level int, visit func(*state, int)) {
@@ -59,8 +64,9 @@ func (ss *stateSet) String() string {
 
 func (n *Node) String() string {
 	output := "\n"
+	indent := "\t"
 	n.traverse(0, func(s *state, level int) {
-		output += fmt.Sprintf("%s%s\n", strings.Repeat("    ", level), s.expr())
+		output += fmt.Sprintf("%s%s\n", strings.Repeat(indent, level), s.expr())
 	})
 	return strings.TrimSuffix(output, "\n")
 }

@@ -9,9 +9,12 @@ func Rule(name string, rules ...*R) *R {
 }
 func (r *R) initRecursiveRule() *R {
 	r.traverseAlt(make(map[*R]bool), func(a *Alt) {
-		for i := range a.Rs {
-			if a.Rs[i] == Self {
-				a.Rs[i] = r
+		if a.Parent == Self {
+			a.Parent = r
+		}
+		for i := range a.Rules {
+			if a.Rules[i] == Self {
+				a.Rules[i] = r
 			}
 		}
 	})
@@ -22,24 +25,26 @@ func Con(rules ...*R) *R {
 	if len(rules) == 1 && rules[0].Name == "" {
 		return rules[0]
 	}
-	return &R{"", Alts{{rules}}}
+	r := &R{}
+	r.Alts = Alts{{r, rules}}
+	return r
 }
 
 func Or(rules ...*R) *R {
 	if len(rules) == 1 && rules[0].Name == "" {
 		return rules[0]
 	}
-	alts := make(Alts, len(rules))
+	r := &R{Alts: make(Alts, len(rules))}
 	for i := range rules {
-		alts[i] = rules[i].toAlt()
+		r.Alts[i] = rules[i].toAlt(r)
 	}
-	return &R{"", alts}
+	return r
 }
-func (r *R) toAlt() *Alt {
+func (r *R) toAlt(parent *R) *Alt {
 	if len(r.Alts) == 1 {
-		return &Alt{r.Alts[0].Rs}
+		return &Alt{parent, r.Alts[0].Rules}
 	}
-	return &Alt{Rs{r}}
+	return &Alt{parent, Rules{r}}
 }
 
 func (r *R) As(name string) *R {
@@ -53,6 +58,12 @@ func (r *R) ZeroOrOne() *R {
 
 func (r *R) ZeroOrMore() *R {
 	x := &R{}
-	x.Alts = Con(x, r).ZeroOrOne().Alts
+	x.Alts = Con(x, r).ZeroOrOne().toAlts(x)
 	return x
+}
+func (r *R) toAlts(parent *R) Alts {
+	r.eachAlt(func(a *Alt) {
+		a.Parent = parent
+	})
+	return r.Alts
 }
