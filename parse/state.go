@@ -8,19 +8,13 @@ type matchingRule struct {
 
 func (r *matchingRule) nextChildRule() *R {
 	if r.d < len(r.Alt.Rs) {
+		if r.Alt.Rs[r.d] == Null {
+			r.d++ // skip trivial null rule
+			return r.nextChildRule()
+		}
 		return r.Alt.Rs[r.d]
 	}
 	return nil
-}
-
-func (r *matchingRule) nextIsNullable() (result bool) {
-	next := r.nextChildRule()
-	next.eachAlt(func(r *R, alt *Alt) {
-		if len(alt.Rs) == 1 && alt.Rs[0] == Null {
-			result = true
-		}
-	})
-	return result
 }
 
 func (r *matchingRule) complete() bool {

@@ -11,6 +11,7 @@ type Parser struct {
 
 func NewParser(r *R) *Parser {
 	cur, next := newStateSet(), newStateSet()
+	// TODO: detect and add EOF
 	cur.add(newState(r, r.Alts[0])) // TODO: Alts[0] needs improvement
 	return &Parser{cur, next}
 }
@@ -19,7 +20,7 @@ func (p *Parser) Parse(token *Token) {
 	p.cur.each(func(s *state) {
 		p.scanPredict(s, newTermState(token))
 	})
-	//	fmt.Printf("set -> %s\n", p.cur.String())
+	//fmt.Printf("set -> %s\n", p.cur.String())
 	p.shift()
 }
 
@@ -35,14 +36,13 @@ func (c *Parser) shift() {
 }
 
 func (ctx *Parser) scanPredict(s, t *state) {
-	if s.nextIsNullable() {
-		ns := s.copy()
-		ns.d++
-		ctx.scanPredict(ns, t)
-	}
 	if !ctx.next.scan(s, t) {
 		s.nextChildRule().eachAlt(func(r *R, alt *Alt) {
-			if !alt.isNull() {
+			if alt.isNull() {
+				ns := s.copy()
+				ns.d++
+				ctx.scanPredict(ns, t)
+			} else {
 				child, isNew := ctx.cur.add(newState(r, alt))
 				child.parents.add(s)
 				if isNew {
