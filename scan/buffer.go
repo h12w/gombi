@@ -6,7 +6,7 @@ import (
 	"unicode/utf8"
 )
 
-type Buffer struct {
+type runeBuffer struct {
 	rd  io.Reader
 	buf []byte
 	r   int // position of next unread rune
@@ -16,11 +16,11 @@ type Buffer struct {
 
 const defaultBufCap = 4096
 
-func NewBuffer(rd io.Reader) *Buffer {
-	return &Buffer{rd: rd, buf: make([]byte, 0, defaultBufCap)}
+func newRuneBuffer(rd io.Reader) *runeBuffer {
+	return &runeBuffer{rd: rd, buf: make([]byte, 0, defaultBufCap)}
 }
 
-func (b *Buffer) ReadRune() (ru rune, size int, err error) {
+func (b *runeBuffer) ReadRune() (ru rune, size int, err error) {
 	for !utf8.FullRune(b.buf[b.r:]) {
 		if err := b.fill(); err != nil {
 			return 0, 0, err
@@ -31,7 +31,7 @@ func (b *Buffer) ReadRune() (ru rune, size int, err error) {
 	return ru, size, nil
 }
 
-func (b *Buffer) ReadToken(n int) (token []byte, pos int, err error) {
+func (b *runeBuffer) ReadToken(n int) (token []byte, pos int, err error) {
 	if t := b.t + n; t > 0 && t <= len(b.buf) {
 		token = b.buf[b.t : b.t+n]
 		pos = b.p
@@ -43,18 +43,18 @@ func (b *Buffer) ReadToken(n int) (token []byte, pos int, err error) {
 	return nil, -1, fmt.Errorf("invalid n %d", n)
 }
 
-func (b *Buffer) bytes() []byte {
+func (b *runeBuffer) bytes() []byte {
 	return b.buf[b.t:]
 }
 
-func (b *Buffer) shift() {
+func (b *runeBuffer) shift() {
 	copy(b.buf, b.buf[b.t:])
 	b.buf = b.buf[:len(b.buf)-b.t]
 	b.r -= b.t
 	b.t = 0
 }
 
-func (b *Buffer) fill() error {
+func (b *runeBuffer) fill() error {
 	buf := b.buf
 	if len(buf) == cap(buf) {
 		b.shift()

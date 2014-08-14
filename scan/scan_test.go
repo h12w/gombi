@@ -3,6 +3,7 @@ package scan
 import (
 	"fmt"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/hailiang/gspec/core"
@@ -79,34 +80,39 @@ var _ = suite.Add(func(s core.S) {
 		a := Char(`a`)
 		s := Char(` `)
 		b := Char(`b`)
+		testScanner := func(scanner scanner) {
+			expect(scanner.Scan()).Equal(true)
+			expect(scanner.Error()).Equal(nil)
+			expect(scanner.Token()).Equal(
+				Token{
+					Type:  2,
+					Value: []byte("b"),
+					Pos:   0,
+				})
+			expect(scanner.Scan()).Equal(true)
+			expect(scanner.Error()).Equal(nil)
+			expect(scanner.Token()).Equal(
+				Token{
+					Type:  1,
+					Value: []byte(" "),
+					Pos:   1,
+				})
+			expect(scanner.Scan()).Equal(true)
+			expect(scanner.Error()).Equal(nil)
+			expect(scanner.Token()).Equal(
+				Token{
+					Type:  0,
+					Value: []byte("a"),
+					Pos:   2,
+				})
+			expect(scanner.Scan()).Equal(false)
+			expect(scanner.Error()).Equal(io.EOF)
+		}
 		tokens := Tokens(a, s, b)
-		scanner, _ := NewStringScanner(tokens.String(), "b a")
-		expect(scanner.Scan()).Equal(true)
-		expect(scanner.Error()).Equal(nil)
-		expect(scanner.Token()).Equal(
-			Token{
-				Type:  2,
-				Value: []byte("b"),
-				Pos:   0,
-			})
-		expect(scanner.Scan()).Equal(true)
-		expect(scanner.Error()).Equal(nil)
-		expect(scanner.Token()).Equal(
-			Token{
-				Type:  1,
-				Value: []byte(" "),
-				Pos:   1,
-			})
-		expect(scanner.Scan()).Equal(true)
-		expect(scanner.Error()).Equal(nil)
-		expect(scanner.Token()).Equal(
-			Token{
-				Type:  0,
-				Value: []byte("a"),
-				Pos:   2,
-			})
-		expect(scanner.Scan()).Equal(false)
-		expect(scanner.Error()).Equal(io.EOF)
+		byteScanner, _ := NewByteStringScanner(tokens.String(), "b a")
+		testScanner(byteScanner)
+		utf8Scanner, _ := NewUTF8StringScanner(tokens.String(), "b a")
+		testScanner(utf8Scanner)
 	})
 })
 
@@ -131,3 +137,17 @@ func op(v interface{}) {
 		"\n")
 }
 */
+
+type scanner interface {
+	Scan() bool
+	Token() Token
+	Error() error
+}
+
+func NewUTF8StringScanner(pat, text string) (*UTF8Scanner, error) {
+	return NewUTF8Scanner(pat, strings.NewReader(text))
+}
+
+func NewByteStringScanner(pat, text string) (*ByteScanner, error) {
+	return NewByteScanner(pat, strings.NewReader(text))
+}
