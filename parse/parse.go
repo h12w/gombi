@@ -31,7 +31,7 @@ func (p *Parser) Parse(token *Token) {
 	p.shift()
 }
 func (c *Parser) shift() {
-	c.cur, c.next = c.next, newStateSet(nil)
+	c.cur, c.next = c.next, c.cur.reset()
 }
 
 func (ctx *Parser) scanPredict(s, t *state) {

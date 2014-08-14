@@ -6,19 +6,19 @@ type state struct {
 	d      int // dot position
 }
 
-// matchingRule is the unchanged part during scanning
+// matchingRule is the unchanged part during scanning.
+// multiple parents are used to handle children with a common prefix or left
+// recursive rule like: S ::= S + M.
 type matchingRule struct {
 	*Alt
-	parents []*state // multiple alternatives (parents) may share a common prefix (child)
+	parents []*state
 	value   interface{}
 }
 
 func newState(alt *Alt) *state {
 	return &state{
-		matchingRule: &matchingRule{
-			Alt: alt,
-		},
-		values: make([]*state, len(alt.Rules)),
+		matchingRule: &matchingRule{Alt: alt},
+		values:       make([]*state, len(alt.Rules)),
 	}
 }
 
@@ -29,13 +29,13 @@ func newTermState(t *Token) *state {
 			Alt:   &Alt{Parent: t.R},
 			value: t.Value,
 		},
-		d: 1,
+		d: 1, // a term state is complete already.
 	}
 }
 
 func (s *state) copy() *state {
 	c := *s
-	c.values = append([]*state{}, s.values...)
+	c.values = append([]*state(nil), s.values...)
 	return &c
 }
 
@@ -44,23 +44,23 @@ func (s *state) step() *state {
 	return s
 }
 
-func (r *state) nextChildRule() *R {
-	if r.Alt.Rules[r.d] == Null {
-		r.step()
+func (s *state) nextChildRule() *R {
+	if s.Alt.Rules[s.d] == Null {
+		s.step() // skip trivial null rule
 	}
-	return r.Alt.Rules[r.d]
+	return s.Alt.Rules[s.d]
 }
 
-func (r *state) complete() bool {
-	return r.d == len(r.Alt.Rules)
+func (s *state) complete() bool {
+	return s.d == len(s.Alt.Rules)
 }
 
-func (r *state) expect(o *R) bool {
-	return !r.complete() && r.nextChildRule() == o
+func (s *state) expect(o *R) bool {
+	return !s.complete() && s.nextChildRule() == o
 }
 
-// scan matches t with the expected input. If matched, it advances itself and
-// returns true, otherwise, returns false.
+// scan matches t with the expected input. If matched, it records the value,
+// advances itself and returns true, otherwise, returns false.
 func (s *state) scan(t *state) bool {
 	if s.expect(t.rule()) {
 		s.values[s.d] = t
@@ -84,6 +84,11 @@ func newStateSet(r *R) *stateSet {
 			ss.add(newState(a), nil)
 		})
 	}
+	return ss
+}
+
+func (ss *stateSet) reset() *stateSet {
+	ss.a = ss.a[:0]
 	return ss
 }
 
