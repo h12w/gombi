@@ -4,12 +4,16 @@ type Node struct {
 	*state
 }
 
+func newNode(s *state) *Node {
+	return &Node{s}
+}
+
 func (n *Node) Rule() *Alt {
 	return n.Alt
 }
 
 func (n *Node) Child(i int) *Node {
-	return &Node{n.values[i]}
+	return newNode(n.values[i])
 }
 
 func (n *Node) ChildCount() int {

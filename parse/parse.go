@@ -65,7 +65,7 @@ func (ss *stateSet) scan(s, t *state) bool {
 func (p *Parser) Results() (rs []*Node) {
 	p.cur.each(func(s *state) {
 		if s.complete() && s.last().isEOF() {
-			rs = append(rs, &Node{s})
+			rs = append(rs, newNode(s))
 		}
 	})
 	return
