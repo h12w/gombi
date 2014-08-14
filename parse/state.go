@@ -1,59 +1,38 @@
 package parse
 
-type matchingRule struct {
-	*Alt
+type state struct {
+	*matchingRule
 	values []*state
-	value  interface{}
 	d      int // dot position
 }
 
-func (r *matchingRule) nextChildRule() *R {
-	if r.d < len(r.Alt.Rules) {
-		if r.Alt.Rules[r.d] == Null {
-			r.d++ // skip trivial null rule
-			return r.nextChildRule()
-		}
-		return r.Alt.Rules[r.d]
-	}
-	return nil
-}
-
-func (r *matchingRule) complete() bool {
-	return r.d == len(r.Alt.Rules)
-}
-
-func (r *matchingRule) equal(o *state) bool {
-	return r.Alt == o.Alt && r.d == o.d
-}
-
-func (r *matchingRule) expect(o *R) bool {
-	return !r.complete() && r.nextChildRule() == o
-}
-
-type state struct {
-	matchingRule
+// matchingRule is the unchanged part during scanning
+type matchingRule struct {
+	*Alt
 	parents *stateSet // multiple alternatives (parents) may share a common prefix (child)
+	value   interface{}
 }
 
 func newState(alt *Alt) *state {
 	return &state{
-		matchingRule: matchingRule{
-			Alt:    alt,
-			values: make([]*state, len(alt.Rules)),
+		matchingRule: &matchingRule{
+			Alt:     alt,
+			parents: newStateSet(nil),
 		},
-		parents: newStateSet(nil),
+		values: make([]*state, len(alt.Rules)),
 	}
 }
 
 // newTermState intializes a parsed state for a terminal rule from a token.
 func newTermState(t *Token) *state {
 	return &state{
-		matchingRule: matchingRule{
-			Alt:   &Alt{Parent: t.R},
-			d:     1,
-			value: t.Value,
+		matchingRule: &matchingRule{
+			Alt:     &Alt{Parent: t.R},
+			value:   t.Value,
+			parents: newStateSet(nil),
 		},
-		parents: newStateSet(nil)}
+		d: 1,
+	}
 }
 
 func (s *state) copy() *state {
@@ -65,6 +44,21 @@ func (s *state) copy() *state {
 func (s *state) step() *state {
 	s.d++
 	return s
+}
+
+func (r *state) nextChildRule() *R {
+	if r.Alt.Rules[r.d] == Null {
+		r.step()
+	}
+	return r.Alt.Rules[r.d]
+}
+
+func (r *state) complete() bool {
+	return r.d == len(r.Alt.Rules)
+}
+
+func (r *state) expect(o *R) bool {
+	return !r.complete() && r.nextChildRule() == o
 }
 
 // scan matches t with the expected input. If matched, it advances itself and
@@ -109,7 +103,7 @@ func (ss *stateSet) add(o, parent *state) (isNew bool) {
 }
 func (ss *stateSet) find(o *state) (*state, bool) {
 	for _, s := range ss.a {
-		if s.equal(o) {
+		if s.Alt == o.Alt && s.d == o.d {
 			return s, true
 		}
 	}

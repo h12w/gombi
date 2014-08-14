@@ -202,9 +202,9 @@ func testParse(s core.S, P *R, tokens []*Token, expected string) {
 	for scanner.Scan() {
 		parser.Parse(scanner.Token())
 	}
-	result := parser.Result()
-	expect(result).NotEqual(nil)
-	expect(result.String()).Equal(unindent(expected + "\n"))
+	results := parser.Results()
+	expect(len(results)).Equal(1)
+	expect(results[0].String()).Equal(unindent(expected + "\n"))
 }
 
 func unindent(s string) string {

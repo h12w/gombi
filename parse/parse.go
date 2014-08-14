@@ -62,9 +62,11 @@ func (ss *stateSet) scan(s, t *state) bool {
 	return false
 }
 
-func (p *Parser) Result() *Node {
-	if len(p.cur.a) > 0 {
-		return &Node{p.cur.a[0]}
-	}
-	return nil
+func (p *Parser) Results() (rs []*Node) {
+	p.cur.each(func(s *state) {
+		if s.complete() && s.last().isEOF() {
+			rs = append(rs, &Node{s})
+		}
+	})
+	return
 }
