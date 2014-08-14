@@ -9,15 +9,14 @@ type state struct {
 // matchingRule is the unchanged part during scanning
 type matchingRule struct {
 	*Alt
-	parents *stateSet // multiple alternatives (parents) may share a common prefix (child)
+	parents []*state // multiple alternatives (parents) may share a common prefix (child)
 	value   interface{}
 }
 
 func newState(alt *Alt) *state {
 	return &state{
 		matchingRule: &matchingRule{
-			Alt:     alt,
-			parents: newStateSet(nil),
+			Alt: alt,
 		},
 		values: make([]*state, len(alt.Rules)),
 	}
@@ -27,9 +26,8 @@ func newState(alt *Alt) *state {
 func newTermState(t *Token) *state {
 	return &state{
 		matchingRule: &matchingRule{
-			Alt:     &Alt{Parent: t.R},
-			value:   t.Value,
-			parents: newStateSet(nil),
+			Alt:   &Alt{Parent: t.R},
+			value: t.Value,
 		},
 		d: 1,
 	}
@@ -97,7 +95,7 @@ func (ss *stateSet) add(o, parent *state) (isNew bool) {
 		isNew = true
 	}
 	if parent != nil {
-		o.parents.add(parent, nil)
+		o.parents = append(o.parents, parent)
 	}
 	return
 }

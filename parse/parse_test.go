@@ -92,7 +92,7 @@ var _ = suite.Add(func(s core.S) {
 			})
 		})
 
-		describe("a parser with nullable rule", func() {
+		given("a grammar with nullable rule", func() {
 			var (
 				A = Term("A")
 				B = Term("B")
@@ -144,7 +144,7 @@ var _ = suite.Add(func(s core.S) {
 				EOF ::= •`)
 		})
 
-		testcase("a case of zero or more repetition", func() {
+		given("a grammar with zero or more repetition", func() {
 			var (
 				A = Term("A")
 				B = Term("B")
@@ -152,33 +152,38 @@ var _ = suite.Add(func(s core.S) {
 				C = Term("C")
 				P = Rule("P", A, X, C)
 			)
-			testParse(s, P, []*Token{
-				{"A", A},
-				{"C", C},
-			}, `
+			testcase("zero", func() {
+				testParse(s, P, []*Token{
+					{"A", A},
+					{"C", C},
+				}, `
 			P ::= A X C EOF•
 				A ::= A•
 				C ::= C•
 				EOF ::= •`)
+			})
 
-			testParse(s, P, []*Token{
-				{"A", A},
-				{"B", B},
-				{"C", C},
-			}, `
+			testcase("one", func() {
+				testParse(s, P, []*Token{
+					{"A", A},
+					{"B", B},
+					{"C", C},
+				}, `
 			P ::= A X C EOF•
 				A ::= A•
 				X ::= X B•
 					B ::= B•
 				C ::= C•
 				EOF ::= •`)
+			})
 
-			testParse(s, P, []*Token{
-				{"A", A},
-				{"B", B},
-				{"B", B},
-				{"C", C},
-			}, `
+			testcase("two", func() {
+				testParse(s, P, []*Token{
+					{"A", A},
+					{"B", B},
+					{"B", B},
+					{"C", C},
+				}, `
 			P ::= A X C EOF•
 				A ::= A•
 				X ::= X B•
@@ -187,6 +192,39 @@ var _ = suite.Add(func(s core.S) {
 					B ::= B•
 				C ::= C•
 				EOF ::= •`)
+			})
+		})
+
+		given("a grammar with common prefix", func() {
+			var (
+				A = Term("A")
+				B = Term("B")
+				X = Rule("X", A)
+				Y = Rule("Y", A, B)
+
+				P = Rule("P", Or(X, Y).As("S"))
+			)
+			testcase("short", func() {
+				testParse(s, P, []*Token{
+					{"A", A},
+				}, `
+			P ::= S EOF•
+				S ::= A•
+					A ::= A•
+				EOF ::= •`)
+			})
+			testcase("short", func() {
+				testParse(s, P, []*Token{
+					{"A", A},
+					{"B", B},
+				}, `
+			P ::= S EOF•
+				S ::= A B•
+					A ::= A•
+					B ::= B•
+				EOF ::= •`)
+			})
+
 		})
 	})
 })

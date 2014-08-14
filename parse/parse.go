@@ -50,10 +50,10 @@ func (ctx *Parser) scanPredict(s, t *state) {
 func (ss *stateSet) scan(s, t *state) bool {
 	if s.scan(t) {
 		if s.complete() && !s.last().isEOF() {
-			s.parents.each(func(parent *state) {
+			for _, parent := range s.parents {
 				// copied because multiple alternatives shares the same parent
 				ss.scan(parent.copy(), s)
-			})
+			}
 		} else {
 			ss.add(s, nil)
 		}
