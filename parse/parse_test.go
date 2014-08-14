@@ -28,18 +28,18 @@ func (s *testScanner) Token() *Token {
 }
 
 var _ = suite.Add(func(s core.S) {
-	describe, testcase := suite.Alias2("describe", "testcase:", s)
+	describe, testcase, given := suite.Alias3("describe", "testcase:", "given", s)
 
 	describe("the parser", func() {
 
-		testcase("simple arithmetic grammar", func() {
+		given("simple arithmetic grammar", func() {
 			var (
 				T    = Term("T")
 				Plus = Term("+")
 				Mult = Term("*")
 				M    = Rule("M", Or(
-					Con(Self, Mult, T),
 					T,
+					Con(Self, Mult, T),
 				))
 				S = Rule("S", Or(
 					Con(Self, Plus, M),
@@ -47,13 +47,36 @@ var _ = suite.Add(func(s core.S) {
 				))
 				P = Rule("P", S)
 			)
-			testParse(s, P, []*Token{
-				{"2", T},
-				{"+", Plus},
-				{"3", T},
-				{"*", Mult},
-				{"4", T},
-			}, `
+			testcase("assotitivity", func() {
+				testParse(s, P, []*Token{
+					{"1", T},
+					{"+", Plus},
+					{"2", T},
+					{"+", Plus},
+					{"3", T},
+				}, `
+			P ::= S EOF•
+				S ::= S + M•
+					S ::= S + M•
+						S ::= M•
+							M ::= T•
+								T ::= 1•
+						+ ::= +•
+						M ::= T•
+							T ::= 2•
+					+ ::= +•
+					M ::= T•
+						T ::= 3•
+				EOF ::= •`)
+			})
+			testcase("precedence", func() {
+				testParse(s, P, []*Token{
+					{"2", T},
+					{"+", Plus},
+					{"3", T},
+					{"*", Mult},
+					{"4", T},
+				}, `
 			P ::= S EOF•
 				S ::= S + M•
 					S ::= M•
@@ -66,6 +89,7 @@ var _ = suite.Add(func(s core.S) {
 						* ::= *•
 						T ::= 4•
 				EOF ::= •`)
+			})
 		})
 
 		describe("a parser with nullable rule", func() {
@@ -180,7 +204,7 @@ func testParse(s core.S, P *R, tokens []*Token, expected string) {
 	}
 	result := parser.Result()
 	expect(result).NotEqual(nil)
-	expect(result.String()).Equal(unindent(expected))
+	expect(result.String()).Equal(unindent(expected + "\n"))
 }
 
 func unindent(s string) string {
