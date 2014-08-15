@@ -56,6 +56,10 @@ func (r *R) ZeroOrOne() *R {
 	return Or(r, Null)
 }
 
+func (r *R) OneOrMore() *R {
+	return Con(r.ZeroOrMore(), r)
+}
+
 func (r *R) ZeroOrMore() *R {
 	x := &R{}
 	x.Alts = Con(x, r).ZeroOrOne().toAlts(x)
