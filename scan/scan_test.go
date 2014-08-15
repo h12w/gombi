@@ -83,7 +83,7 @@ var _ = suite.Add(func(s core.S) {
 		a := Char(`a`)
 		s := Char(` `)
 		b := Char(`b`)
-		testScanner := func(scanner scanner) {
+		testScanner := func(scanner Scanner) {
 			expect(scanner.Scan()).Equal(true)
 			expect(scanner.Error()).Equal(nil)
 			expect(scanner.Token()).Equal(
@@ -141,18 +141,12 @@ func op(v interface{}) {
 }
 */
 
-type scanner interface {
-	Scan() bool
-	Token() *Token
-	Error() error
-}
-
-func NewUTF8StringScanner(m *Matcher, text string) (*UTF8Scanner, error) {
+func NewUTF8StringScanner(m *Matcher, text string) (Scanner, error) {
 	s := NewUTF8Scanner(m)
 	return s, s.Init(strings.NewReader(text))
 }
 
-func NewByteStringScanner(m *Matcher, text string) (*ByteScanner, error) {
+func NewByteStringScanner(m *Matcher, text string) (Scanner, error) {
 	s := NewByteScanner(m)
 	return s, s.Init(strings.NewReader(text))
 }

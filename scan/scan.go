@@ -6,6 +6,14 @@ import (
 	"io/ioutil"
 )
 
+type Scanner interface {
+	Init(r io.Reader) error
+	SetMatcher(m *Matcher)
+	Scan() bool
+	Token() *Token
+	Error() error
+}
+
 type Token struct {
 	ID    int
 	Pos   int
