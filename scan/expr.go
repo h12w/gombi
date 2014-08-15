@@ -8,7 +8,7 @@ type Expr interface {
 
 type exprs []Expr
 
-func (es exprs) or(captured bool) Pattern {
+func (es exprs) capture(captured bool) Pattern {
 	var w exprWriter
 	for i, e := range es {
 		if i > 0 {

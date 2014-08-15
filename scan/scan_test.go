@@ -19,6 +19,9 @@ var _ = suite.Add(func(s core.S) {
 	describe("patterns", func() {
 		given("a pattern", func() {
 			a := Pat("ab")
+			it("can be repeated zero or one time", func() {
+				expect(a.ZeroOrOne().String()).Equal("(?:ab)?")
+			})
 			it("can be repeated zero or more times", func() {
 				expect(a.ZeroOrMore().String()).Equal("(?:ab)*")
 			})
@@ -84,34 +87,34 @@ var _ = suite.Add(func(s core.S) {
 			expect(scanner.Scan()).Equal(true)
 			expect(scanner.Error()).Equal(nil)
 			expect(scanner.Token()).Equal(
-				Token{
-					Type:  2,
+				&Token{
+					ID:    2,
 					Value: []byte("b"),
 					Pos:   0,
 				})
 			expect(scanner.Scan()).Equal(true)
 			expect(scanner.Error()).Equal(nil)
 			expect(scanner.Token()).Equal(
-				Token{
-					Type:  1,
+				&Token{
+					ID:    1,
 					Value: []byte(" "),
 					Pos:   1,
 				})
 			expect(scanner.Scan()).Equal(true)
 			expect(scanner.Error()).Equal(nil)
 			expect(scanner.Token()).Equal(
-				Token{
-					Type:  0,
+				&Token{
+					ID:    0,
 					Value: []byte("a"),
 					Pos:   2,
 				})
 			expect(scanner.Scan()).Equal(false)
 			expect(scanner.Error()).Equal(io.EOF)
 		}
-		tokens := Tokens(a, s, b)
-		byteScanner, _ := NewByteStringScanner(tokens.String(), "b a")
+		m := NewMatcher(a, s, b)
+		byteScanner, _ := NewByteStringScanner(m, "b a")
 		testScanner(byteScanner)
-		utf8Scanner, _ := NewUTF8StringScanner(tokens.String(), "b a")
+		utf8Scanner, _ := NewUTF8StringScanner(m, "b a")
 		testScanner(utf8Scanner)
 	})
 })
@@ -140,14 +143,16 @@ func op(v interface{}) {
 
 type scanner interface {
 	Scan() bool
-	Token() Token
+	Token() *Token
 	Error() error
 }
 
-func NewUTF8StringScanner(pat, text string) (*UTF8Scanner, error) {
-	return NewUTF8Scanner(pat, strings.NewReader(text))
+func NewUTF8StringScanner(m *Matcher, text string) (*UTF8Scanner, error) {
+	s := NewUTF8Scanner(m)
+	return s, s.Init(strings.NewReader(text))
 }
 
-func NewByteStringScanner(pat, text string) (*ByteScanner, error) {
-	return NewByteScanner(pat, strings.NewReader(text))
+func NewByteStringScanner(m *Matcher, text string) (*ByteScanner, error) {
+	s := NewByteScanner(m)
+	return s, s.Init(strings.NewReader(text))
 }

@@ -9,6 +9,13 @@ func Pat(pat string) Pattern {
 	return p
 }
 
+func (p Pattern) ZeroOrOne() Pattern {
+	var w exprWriter
+	w.group(p)
+	w.WriteByte('?')
+	return w.pat()
+}
+
 func (p Pattern) ZeroOrMore() Pattern {
 	var w exprWriter
 	w.group(p)
@@ -24,7 +31,7 @@ func (p Pattern) OneOrMore() Pattern {
 }
 
 func Or(es ...Expr) Pattern {
-	return exprs(es).or(false)
+	return exprs(es).capture(false)
 }
 
 func Con(es ...Expr) Pattern {
@@ -33,8 +40,4 @@ func Con(es ...Expr) Pattern {
 		w.group(e)
 	}
 	return w.pat()
-}
-
-func Tokens(es ...Expr) Pattern {
-	return Con(Pat(`\A`), exprs(es).or(true))
 }

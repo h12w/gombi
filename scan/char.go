@@ -66,5 +66,5 @@ func (p CharSet) Exclude(cs ...CharSet) CharSet {
 }
 
 func Merge(es ...Expr) CharSet {
-	return newCharSet(exprs(es).or(false))
+	return newCharSet(exprs(es).capture(false))
 }
