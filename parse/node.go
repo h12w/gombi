@@ -5,11 +5,18 @@ type Node struct {
 }
 
 func newNode(s *state) *Node {
+	if s == nil {
+		return nil
+	}
 	return &Node{s}
 }
 
-func (n *Node) Rule() *Alt {
-	return n.Alt
+func (n *Node) Alt() *Alt {
+	return n.state.Alt
+}
+
+func (n *Node) Rule() *R {
+	return n.state.Alt.Parent
 }
 
 func (n *Node) Child(i int) *Node {
