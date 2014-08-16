@@ -60,9 +60,7 @@ func (s *ByteScanner) Scan() bool {
 	buf := s.buf[s.p:]
 	id, size := s.matcher.matchBytes(buf)
 	if id == -1 {
-		if s.p == len(s.buf) {
-			s.err = io.EOF
-		} else {
+		if s.p < len(s.buf) {
 			s.err = invalidInputError(s.matcher, buf)
 		}
 		return false
@@ -93,9 +91,7 @@ func (s *UTF8Scanner) Init(r io.Reader) error {
 func (s *UTF8Scanner) Scan() bool {
 	id, size := s.matcher.matchReader(s.buf)
 	if id == -1 {
-		if _, _, err := s.buf.ReadRune(); err != nil {
-			s.err = err
-		} else {
+		if _, _, err := s.buf.ReadRune(); err != io.EOF {
 			s.err = invalidInputError(s.matcher, s.buf.bytes())
 		}
 		return false
