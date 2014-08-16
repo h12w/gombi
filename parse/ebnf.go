@@ -84,7 +84,7 @@ func (r *R) OneOrMore() *R {
 
 func (r *R) ZeroOrMore() *R {
 	x := newR().As(parens(r.Name) + "*")
-	x.Alts = Or(Con(x, r), Null).toAlts(x)
+	x.Alts = Or(Con(r, x), Null).toAlts(x)
 	return x
 }
 func (r *R) toAlts(parent *R) Alts {
