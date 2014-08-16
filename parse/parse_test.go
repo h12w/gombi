@@ -166,7 +166,7 @@ var _ = suite.Add(func(s core.S) {
 				}, `
 			P ::= A X C EOF•
 				A ::= A•
-				X ::= X B•
+				X ::= B X•
 					B ::= B•
 				C ::= C•
 				EOF ::= •`)
@@ -181,10 +181,10 @@ var _ = suite.Add(func(s core.S) {
 				}, `
 			P ::= A X C EOF•
 				A ::= A•
-				X ::= X B•
-					X ::= X B•
-						B ::= B•
+				X ::= B X•
 					B ::= B•
+					X ::= B X•
+						B ::= B•
 				C ::= C•
 				EOF ::= •`)
 			})
