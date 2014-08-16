@@ -6,6 +6,10 @@ import (
 )
 
 func (r *R) expr() string {
+	if r.Name == "" {
+		addr := fmt.Sprintf("%p", r)
+		return "<" + addr[len(addr)-4:] + ">"
+	}
 	return r.Name
 }
 
@@ -13,35 +17,35 @@ func (r *R) String() string {
 	return fmt.Sprintf("%s ::= %s", r.Name, r.Alts.expr())
 }
 
-func (rs Rules) expr() string {
+func (rs Rules) expr(sep string) string {
 	ss := make([]string, len(rs))
 	for i := range rs {
 		ss[i] = rs[i].expr()
 	}
-	return strings.Join(ss, " ")
+	return strings.Join(ss, sep)
 }
 
 func (as Alts) expr() string {
 	ss := make([]string, len(as))
 	for i := range as {
-		ss[i] = as[i].expr()
+		ss[i] = as[i].expr(" ")
 	}
 	return strings.Join(ss, " | ")
 }
 
 func (s *state) name() string {
-	return s.Alt.Parent.Name
+	return s.Alt.Parent.expr()
 }
 
 func (s *state) expr() string {
-	if s.value != nil {
+	if s.token != nil {
 		if s.d == 0 {
-			return fmt.Sprintf("%s ::= •%v", s.name(), s.value)
+			return fmt.Sprintf("%s ::= •%v", s.name(), string(s.token.Value))
 		} else if s.d == 1 {
-			return fmt.Sprintf("%s ::= %v•", s.name(), s.value)
+			return fmt.Sprintf("%s ::= %v•", s.name(), string(s.token.Value))
 		}
 	}
-	return fmt.Sprintf("%s ::= %v•%v", s.name(), s.Alt.Rules[:s.d].expr(), s.Alt.Rules[s.d:].expr())
+	return fmt.Sprintf("%s ::= %v•%v", s.name(), s.Alt.Rules[:s.d].expr(" "), s.Alt.Rules[s.d:].expr(" "))
 }
 
 func (s *state) traverse(level int, visit func(*state, int)) {

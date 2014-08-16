@@ -20,6 +20,10 @@ func (n *Node) ChildCount() int {
 	return len(n.values)
 }
 
-func (n *Node) Value() interface{} {
-	return n.value
+func (n *Node) Value() []byte {
+	return n.token.Value
+}
+
+func (n *Node) Pos() int {
+	return n.token.Pos
 }

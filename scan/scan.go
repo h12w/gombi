@@ -14,16 +14,15 @@ type Scanner interface {
 	Error() error
 }
 
-type Token struct {
-	ID    int
-	Pos   int
-	Value []byte
-}
-
 type scannerBase struct {
 	matcher *Matcher
 	err     error
 	tok     *Token
+}
+type Token struct {
+	ID    int
+	Value []byte
+	Pos   int
 }
 
 func (s *scannerBase) SetMatcher(m *Matcher) {

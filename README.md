@@ -4,17 +4,23 @@ Gombi: Creating Your Own Parser is Easier than Regular Expressions
 Gombi is a combinator-style scanner & parser library written in Go. It is
 practical, reasonably fast and extremely easy to use.
 
+Quick start
+-----------
+```bash
+go get -u github.com/hailiang/gombi
+```
+
 Design
 ------
 
 [Combinator parsers](http://en.wikipedia.org/wiki/Parser_combinator) are
 straightforward to construct, modular and easily maintainable, compared to
-a parser generator like Lex/Yacc.
+parser generators like Lex/Yacc.
 
 * Internal DSL
-    * no additional generation and complition.
+    * no additional code generation and compilation.
 * Composable
-    * a subset of the syntax tree can also be used as a paresr.
+    * a subset of the syntax tree is also a parser.
     * a language can be easily embedded into another one.
 
 Gombi is inspired by but not limited to parser combinators. Unlike a combinator
@@ -23,6 +29,6 @@ implementation to functional combinators. Go is not a pure functional language
 as Haskell, so cloning a combinator parser like Parsec to Go will only lead to
 an implementaion much worse than Parsec. Instead, Gombi is free to choose any Go
 language structures that are suitable for a modular and convenient API, and any
-algorithms that can be efficiently implemented with Go.
+algorithms that can be efficiently implemented in Go.
 
 *Under development*

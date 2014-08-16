@@ -12,7 +12,11 @@ type state struct {
 type matchingRule struct {
 	*Alt
 	parents []*state
-	value   interface{}
+	token   *Token
+}
+type Token struct {
+	Value []byte
+	Pos   int
 }
 
 func newState(alt *Alt) *state {
@@ -23,11 +27,11 @@ func newState(alt *Alt) *state {
 }
 
 // newTermState intializes a parsed state for a terminal rule from a token.
-func newTermState(t *Token) *state {
+func newTermState(t *Token, r *R) *state {
 	return &state{
 		matchingRule: &matchingRule{
-			Alt:   &Alt{Parent: t.R},
-			value: t.Value,
+			Alt:   &Alt{Parent: r},
+			token: t,
 		},
 		d: 1, // a term state is complete already.
 	}
@@ -80,9 +84,7 @@ type stateSet struct {
 func newStateSet(r *R) *stateSet {
 	ss := &stateSet{}
 	if r != nil {
-		r.eachAlt(func(a *Alt) {
-			ss.add(newState(a), nil)
-		})
+		ss.a = append(ss.a, newState(&Alt{Parent: newR(), Rules: Rules{r}}))
 	}
 	return ss
 }

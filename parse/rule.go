@@ -4,6 +4,7 @@ type (
 	// R is a BNF production rule
 	R struct {
 		Name string
+		//		ID   int
 		Alts
 	}
 	Alt struct {
@@ -12,12 +13,6 @@ type (
 	}
 	Rules []*R
 	Alts  []*Alt
-)
-
-var (
-	EOF  = Term("EOF")
-	Null = Term("Null")
-	Self = Term("Self")
 )
 
 func (r *R) isEOF() bool {
@@ -34,14 +29,15 @@ func (r *R) eachAlt(visit func(a *Alt)) {
 	}
 }
 
-func (r *R) traverseAlt(m map[*R]bool, visit func(*Alt)) {
+func (r *R) traverseRule(m map[*R]bool, visit func(*R)) {
+	if m[r] {
+		return
+	}
 	m[r] = true
+	visit(r)
 	for _, a := range r.Alts {
-		visit(a)
 		for _, rule := range a.Rules {
-			if !m[r] {
-				rule.traverseAlt(m, visit)
-			}
+			rule.traverseRule(m, visit)
 		}
 	}
 }

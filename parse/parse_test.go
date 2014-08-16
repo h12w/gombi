@@ -10,11 +10,11 @@ import (
 )
 
 type testScanner struct {
-	tokens []*Token
+	tokens []*testToken
 	i      int
 }
 
-func newTestScanner(tokens []*Token) *testScanner {
+func newTestScanner(tokens []*testToken) *testScanner {
 	return &testScanner{tokens: tokens, i: -1}
 }
 
@@ -23,8 +23,9 @@ func (s *testScanner) Scan() bool {
 	return s.i < len(s.tokens)
 }
 
-func (s *testScanner) Token() *Token {
-	return s.tokens[s.i]
+func (s *testScanner) Token() (*Token, *R) {
+	t := s.tokens[s.i]
+	return t.t, t.r
 }
 
 var _ = suite.Add(func(s core.S) {
@@ -45,15 +46,15 @@ var _ = suite.Add(func(s core.S) {
 					Con(Self, Plus, M),
 					M,
 				))
-				P = Rule("P", S)
+				P = Rule("P", S, EOF)
 			)
 			testcase("assotitivity", func() {
-				testParse(s, P, []*Token{
-					{"1", T},
-					{"+", Plus},
-					{"2", T},
-					{"+", Plus},
-					{"3", T},
+				testParse(s, P, TT{
+					tok("1", T),
+					tok("+", Plus),
+					tok("2", T),
+					tok("+", Plus),
+					tok("3", T),
 				}, `
 			P ::= S EOF•
 				S ::= S + M•
@@ -70,12 +71,12 @@ var _ = suite.Add(func(s core.S) {
 				EOF ::= •`)
 			})
 			testcase("precedence", func() {
-				testParse(s, P, []*Token{
-					{"2", T},
-					{"+", Plus},
-					{"3", T},
-					{"*", Mult},
-					{"4", T},
+				testParse(s, P, TT{
+					tok("2", T),
+					tok("+", Plus),
+					tok("3", T),
+					tok("*", Mult),
+					tok("4", T),
 				}, `
 			P ::= S EOF•
 				S ::= S + M•
@@ -98,31 +99,33 @@ var _ = suite.Add(func(s core.S) {
 				B = Term("B")
 				X = Rule("X", B.ZeroOrOne())
 				C = Term("C")
-				P = Rule("P", A, X, C)
+				P = Rule("P", Con(A, X).As("AX"), C)
 			)
 
 			testcase("a sequence without the optional token", func() {
-				testParse(s, P, []*Token{
-					{"A", A},
-					{"C", C},
+				testParse(s, P, TT{
+					tok("A", A),
+					tok("C", C),
 				}, `
-				P ::= A X C EOF•
-					A ::= A•
+				P ::= AX C EOF•
+					AX ::= A X•
+						A ::= A•
 					C ::= C•
 					EOF ::= •`,
 				)
 			})
 
 			testcase("a sequence with the optional token", func() {
-				testParse(s, P, []*Token{
-					{"A", A},
-					{"B", B},
-					{"C", C},
+				testParse(s, P, TT{
+					tok("A", A),
+					tok("B", B),
+					tok("C", C),
 				}, `
-				P ::= A X C EOF•
-					A ::= A•
-					X ::= B•
-						B ::= B•
+				P ::= AX C EOF•
+					AX ::= A X•
+						A ::= A•
+						X ::= B•
+							B ::= B•
 					C ::= C•
 					EOF ::= •`)
 			})
@@ -134,9 +137,9 @@ var _ = suite.Add(func(s core.S) {
 				C = Term("C")
 				P = Rule("P", A, Null, C)
 			)
-			testParse(s, P, []*Token{
-				{"A", A},
-				{"C", C},
+			testParse(s, P, TT{
+				tok("A", A),
+				tok("C", C),
 			}, `
 			P ::= A Null C EOF•
 				A ::= A•
@@ -153,9 +156,9 @@ var _ = suite.Add(func(s core.S) {
 				P = Rule("P", A, X, C)
 			)
 			testcase("zero", func() {
-				testParse(s, P, []*Token{
-					{"A", A},
-					{"C", C},
+				testParse(s, P, TT{
+					tok("A", A),
+					tok("C", C),
 				}, `
 			P ::= A X C EOF•
 				A ::= A•
@@ -164,10 +167,10 @@ var _ = suite.Add(func(s core.S) {
 			})
 
 			testcase("one", func() {
-				testParse(s, P, []*Token{
-					{"A", A},
-					{"B", B},
-					{"C", C},
+				testParse(s, P, TT{
+					tok("A", A),
+					tok("B", B),
+					tok("C", C),
 				}, `
 			P ::= A X C EOF•
 				A ::= A•
@@ -178,11 +181,11 @@ var _ = suite.Add(func(s core.S) {
 			})
 
 			testcase("two", func() {
-				testParse(s, P, []*Token{
-					{"A", A},
-					{"B", B},
-					{"B", B},
-					{"C", C},
+				testParse(s, P, TT{
+					tok("A", A),
+					tok("B", B),
+					tok("B", B),
+					tok("C", C),
 				}, `
 			P ::= A X C EOF•
 				A ::= A•
@@ -205,23 +208,21 @@ var _ = suite.Add(func(s core.S) {
 				P = Rule("P", Or(X, Y).As("S"))
 			)
 			testcase("short", func() {
-				testParse(s, P, []*Token{
-					{"A", A},
+				testParse(s, P, TT{
+					tok("A", A),
 				}, `
-			P ::= S EOF•
-				S ::= A•
-					A ::= A•
+			P ::= X EOF•
+				X ::= A•
 				EOF ::= •`)
 			})
 			testcase("short", func() {
-				testParse(s, P, []*Token{
-					{"A", A},
-					{"B", B},
+				testParse(s, P, TT{
+					tok("A", A),
+					tok("B", B),
 				}, `
-			P ::= S EOF•
-				S ::= A B•
-					A ::= A•
-					B ::= B•
+			P ::= X B EOF•
+				X ::= A•
+				B ::= B•
 				EOF ::= •`)
 			})
 
@@ -233,9 +234,9 @@ func TestAll(t *testing.T) {
 	suite.Test(t)
 }
 
-func testParse(s core.S, P *R, tokens []*Token, expected string) {
+func testParse(s core.S, P *R, tokens TT, expected string) {
 	expect := exp.Alias(s.FailNow, 1)
-	scanner := newTestScanner(append(tokens, &Token{"", EOF}))
+	scanner := newTestScanner(append(tokens, tok("", EOF)))
 	parser := NewParser(P)
 	for scanner.Scan() {
 		parser.Parse(scanner.Token())
@@ -268,4 +269,14 @@ func unindent(s string) string {
 		lines[i] = strings.TrimPrefix(lines[i], indent)
 	}
 	return strings.Join(lines, "\n")
+}
+
+type testToken struct {
+	t *Token
+	r *R
+}
+type TT []*testToken
+
+func tok(v string, r *R) *testToken {
+	return &testToken{&Token{[]byte(v), 0}, r}
 }

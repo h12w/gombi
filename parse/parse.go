@@ -1,10 +1,5 @@
 package parse
 
-type Token struct {
-	Value interface{}
-	*R
-}
-
 type Parser struct {
 	cur, next *stateSet
 }
@@ -23,11 +18,14 @@ func (r *R) appendEOF() *R {
 	return r
 }
 
-func (p *Parser) Parse(token *Token) {
+func (p *Parser) Parse(t *Token, r *R) {
+	//fmt.Printf("cur set -> %s\n", p.cur.String())
 	p.cur.each(func(s *state) {
-		p.scanPredict(s, newTermState(token))
+		p.scanPredict(s, newTermState(t, r))
 	})
-	//fmt.Printf("set -> %s\n", p.cur.String())
+	//fmt.Printf("cur set -> %s\n", p.cur.String())
+	//fmt.Printf("next set -> %s\n", p.next.String())
+	//fmt.Println()
 	p.shift()
 }
 func (c *Parser) shift() {
@@ -39,11 +37,23 @@ func (ctx *Parser) scanPredict(s, t *state) {
 		s.nextChildRule().eachAlt(func(alt *Alt) {
 			if alt.isNull() {
 				// copied because other alternatives should not be skipped
-				ctx.scanPredict(s.copy().step(), t)
+				ctx.scanNull(s.copy().step(), t)
 			} else if child := newState(alt); ctx.cur.add(child, s) {
 				ctx.scanPredict(child, t)
 			}
 		})
+	}
+}
+
+func (ctx *Parser) scanNull(s, t *state) {
+	if s.complete() {
+		for _, parent := range s.parents {
+			np := parent.copy()
+			np.scan(s)
+			ctx.scanNull(np, t)
+		}
+	} else {
+		ctx.scanPredict(s, t)
 	}
 }
 
@@ -55,7 +65,7 @@ func (ss *stateSet) scan(s, t *state) bool {
 				ss.scan(parent.copy(), s)
 			}
 		} else {
-			ss.add(s, nil)
+			ss.add(s, nil) // TODO may not need to check duplicates
 		}
 		return true
 	}
