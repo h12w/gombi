@@ -59,15 +59,11 @@ var _ = suite.Add(func(s core.S) {
 			P ::= S EOF•
 				S ::= S + M•
 					S ::= S + M•
-						S ::= M•
-							M ::= T•
-								T ::= 1•
+						T ::= 1•
 						+ ::= +•
-						M ::= T•
-							T ::= 2•
+						T ::= 2•
 					+ ::= +•
-					M ::= T•
-						T ::= 3•
+					T ::= 3•
 				EOF ::= •`)
 			})
 			testcase("precedence", func() {
@@ -80,13 +76,10 @@ var _ = suite.Add(func(s core.S) {
 				}, `
 			P ::= S EOF•
 				S ::= S + M•
-					S ::= M•
-						M ::= T•
-							T ::= 2•
+					T ::= 2•
 					+ ::= +•
 					M ::= M * T•
-						M ::= T•
-							T ::= 3•
+						T ::= 3•
 						* ::= *•
 						T ::= 4•
 				EOF ::= •`)
@@ -124,8 +117,7 @@ var _ = suite.Add(func(s core.S) {
 				P ::= AX C EOF•
 					AX ::= A X•
 						A ::= A•
-						X ::= B•
-							B ::= B•
+						B ::= B•
 					C ::= C•
 					EOF ::= •`)
 			})

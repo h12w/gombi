@@ -52,9 +52,13 @@ func (s *state) traverse(level int, visit func(*state, int)) {
 	if s == nil {
 		return
 	}
-	visit(s, level)
-	for _, c := range s.values {
-		c.traverse(level+1, visit)
+	if len(s.values) == 1 {
+		s.values[0].traverse(level, visit)
+	} else {
+		visit(s, level)
+		for _, c := range s.values {
+			c.traverse(level+1, visit)
+		}
 	}
 }
 
