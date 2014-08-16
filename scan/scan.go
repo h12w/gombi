@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 )
 
+const EOF = 0
+
 type Scanner interface {
 	Init(r io.Reader) error
 	SetMatcher(m *Matcher)
@@ -33,7 +35,19 @@ func (s *scannerBase) Token() *Token {
 	return s.tok
 }
 
+func (s *scannerBase) setEOF(pos int) {
+	s.err = io.EOF
+	s.tok = &Token{
+		ID:    EOF,
+		Value: nil,
+		Pos:   pos,
+	}
+}
+
 func (s *scannerBase) Error() error {
+	if s.err == io.EOF {
+		return nil
+	}
 	return s.err
 }
 
@@ -57,12 +71,17 @@ func (s *ByteScanner) Init(r io.Reader) error {
 }
 
 func (s *ByteScanner) Scan() bool {
+	if s.err == io.EOF {
+		return false
+	}
 	buf := s.buf[s.p:]
 	id, size := s.matcher.matchBytes(buf)
 	if id == -1 {
-		if s.p < len(s.buf) {
-			s.err = invalidInputError(s.matcher, buf)
+		if s.p == len(s.buf) {
+			s.setEOF(s.p)
+			return true
 		}
+		s.err = invalidInputError(s.matcher, buf)
 		return false
 	}
 	s.tok = &Token{
@@ -89,11 +108,20 @@ func (s *UTF8Scanner) Init(r io.Reader) error {
 }
 
 func (s *UTF8Scanner) Scan() bool {
+	if s.err == io.EOF {
+		return false
+	}
 	id, size := s.matcher.matchReader(s.buf)
 	if id == -1 {
-		if _, _, err := s.buf.ReadRune(); err != io.EOF {
-			s.err = invalidInputError(s.matcher, s.buf.bytes())
+		if _, _, err := s.buf.ReadRune(); err != nil {
+			if err == io.EOF {
+				s.setEOF(s.buf.p)
+				return true
+			}
+			s.err = err
+			return false
 		}
+		s.err = invalidInputError(s.matcher, s.buf.bytes())
 		return false
 	}
 	token, pos, err := s.buf.ReadToken(size)

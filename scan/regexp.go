@@ -34,9 +34,9 @@ func (m *Matcher) result(match []int) (id, size int) {
 		for i := 2; i < len(match)-1; i += 2 {
 			if match[i] != -1 {
 				size = match[i+1] // m[i] must be 0
-				id = i/2 - 1
+				id = i / 2
 				if m.ids != nil {
-					id = m.ids[id]
+					id = m.ids[id-1]
 				}
 				return id, size
 			}

@@ -2,7 +2,6 @@ package scan
 
 import (
 	"fmt"
-	"io"
 	"strings"
 	"testing"
 
@@ -88,7 +87,7 @@ var _ = suite.Add(func(s core.S) {
 			expect(scanner.Error()).Equal(nil)
 			expect(scanner.Token()).Equal(
 				&Token{
-					ID:    2,
+					ID:    3,
 					Value: []byte("b"),
 					Pos:   0,
 				})
@@ -96,7 +95,7 @@ var _ = suite.Add(func(s core.S) {
 			expect(scanner.Error()).Equal(nil)
 			expect(scanner.Token()).Equal(
 				&Token{
-					ID:    1,
+					ID:    2,
 					Value: []byte(" "),
 					Pos:   1,
 				})
@@ -104,12 +103,20 @@ var _ = suite.Add(func(s core.S) {
 			expect(scanner.Error()).Equal(nil)
 			expect(scanner.Token()).Equal(
 				&Token{
-					ID:    0,
+					ID:    1,
 					Value: []byte("a"),
 					Pos:   2,
 				})
+			expect(scanner.Scan()).Equal(true)
+			expect(scanner.Error()).Equal(nil)
+			expect(scanner.Token()).Equal(
+				&Token{
+					ID:    EOF,
+					Value: nil,
+					Pos:   3,
+				})
 			expect(scanner.Scan()).Equal(false)
-			expect(scanner.Error()).Equal(io.EOF)
+			expect(scanner.Error()).Equal(nil)
 		}
 		m := NewMatcher(a, s, b)
 		byteScanner, _ := NewByteStringScanner(m, "b a")
