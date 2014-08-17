@@ -2,13 +2,13 @@ package parse
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
 func (r *R) Name() string {
 	if r.name == "" {
-		addr := fmt.Sprintf("%p", r)
-		return "<" + addr[len(addr)-4:] + ">"
+		return parens(r.Alts.String())
 	}
 	return r.name
 }
@@ -17,7 +17,7 @@ func (r *R) String() string {
 	return fmt.Sprintf("%s ::= %s", r.Name(), r.Alts.String())
 }
 
-func (rs Rules) expr(sep string) string {
+func (rs Rules) toString(sep string) string {
 	ss := make([]string, len(rs))
 	for i := range rs {
 		ss[i] = rs[i].Name()
@@ -27,7 +27,7 @@ func (rs Rules) expr(sep string) string {
 }
 
 func (a Alt) String() string {
-	return a.Rules.expr(" ")
+	return a.Rules.toString(" ")
 }
 
 func (as Alts) String() string {
@@ -46,15 +46,22 @@ func (s *state) name() string {
 	return s.Alt.Parent.Name()
 }
 
-func (s *state) expr() string {
+func (s *state) String() string {
 	if s.token != nil {
 		if s.d == 0 {
-			return fmt.Sprintf("%s ::= •%v", s.name(), string(s.token.Value))
+			return fmt.Sprintf("%s ::= •%v", s.name(), escapeValue(string(s.token.Value)))
 		} else if s.d == 1 {
-			return fmt.Sprintf("%s ::= %v•", s.name(), string(s.token.Value))
+			return fmt.Sprintf("%s ::= %v•", s.name(), escapeValue(string(s.token.Value)))
 		}
 	}
-	return fmt.Sprintf("%s ::= %v•%v", s.name(), s.Alt.Rules[:s.d].expr(" "), s.Alt.Rules[s.d:].expr(" "))
+	return fmt.Sprintf("%s ::= %v•%v", s.name(), s.Alt.Rules[:s.d].toString(" "), s.Alt.Rules[s.d:].toString(" "))
+}
+func escapeValue(v string) string {
+	s := strconv.Quote(v)
+	if !strings.ContainsAny(s, "()|") {
+		s = s[1 : len(s)-1]
+	}
+	return s
 }
 
 func (s *state) traverse(level int, visit func(*state, int)) {
@@ -74,7 +81,7 @@ func (s *state) traverse(level int, visit func(*state, int)) {
 func (ss *stateSet) String() string {
 	strs := make([]string, 0, len(ss.a))
 	for _, s := range ss.a {
-		strs = append(strs, s.expr())
+		strs = append(strs, s.String())
 	}
 	return strings.Join(strs, ", ")
 }
@@ -83,7 +90,16 @@ func (n *Node) String() string {
 	output := "\n"
 	indent := "\t"
 	n.traverse(0, func(s *state, level int) {
-		output += fmt.Sprintf("%s%s\n", strings.Repeat(indent, level), s.expr())
+		output += fmt.Sprintf("%s%s\n", strings.Repeat(indent, level), s.String())
 	})
 	return output
+}
+
+func parens(s string) string {
+	if strings.ContainsAny(s, " |") {
+		if !strings.HasPrefix(s, "(") || !strings.HasSuffix(s, ")") {
+			return "(" + s + ")"
+		}
+	}
+	return s
 }

@@ -1,13 +1,11 @@
 package parse
 
-import "strings"
-
 //const noID = -42
 
 var (
 	EOF  = Term("EOF")
 	Null = Term("Null")
-	Self = Term("Self")
+	self = Term("")
 )
 
 func newR() *R {
@@ -29,11 +27,11 @@ func (r *R) initRecursiveRule(m map[*R]bool, selfValue *R) {
 	}
 	m[r] = true
 	for _, alt := range r.Alts {
-		if alt.Parent == Self {
+		if alt.Parent == self {
 			alt.Parent = selfValue
 		}
 		for i, cr := range alt.Rules {
-			if cr == Self {
+			if cr == self {
 				alt.Rules[i] = selfValue
 			} else {
 				cr.initRecursiveRule(m, selfValue)
@@ -42,8 +40,13 @@ func (r *R) initRecursiveRule(m map[*R]bool, selfValue *R) {
 	}
 }
 
+func Self(name string) *R {
+	self.name = name
+	return self
+}
+
 func Con(rules ...*R) *R {
-	if len(rules) == 1 {
+	if len(rules) == 1 && rules[0].name == "" {
 		return rules[0]
 	}
 	r := newR()
@@ -52,7 +55,7 @@ func Con(rules ...*R) *R {
 }
 
 func Or(rules ...*R) *R {
-	if len(rules) == 1 {
+	if len(rules) == 1 && rules[0].name == "" {
 		return rules[0]
 	}
 	r := newR()
@@ -63,7 +66,7 @@ func Or(rules ...*R) *R {
 	return r
 }
 func (r *R) toAlt(parent *R) *Alt {
-	if len(r.Alts) == 1 && r.name == "" {
+	if len(r.Alts) == 1 && r.name == "" { // reduce unnamed rule
 		return &Alt{parent, r.Alts[0].Rules}
 	}
 	return &Alt{parent, Rules{r}}
@@ -75,15 +78,15 @@ func (r *R) As(name string) *R {
 }
 
 func (r *R) ZeroOrOne() *R {
-	return Or(r, Null).As(parens(r.Name()) + "?")
+	return Or(r, Null) //.As(parens(r.Name()) + "?")
 }
 
 func (r *R) OneOrMore() *R {
-	return Con(r, r.ZeroOrMore()).As(parens(r.Name()) + "+")
+	return Con(r, r.ZeroOrMore()) //.As(parens(r.Name()) + "+")
 }
 
 func (r *R) ZeroOrMore() *R {
-	x := newR().As(parens(r.Name()) + "*")
+	x := newR() //.As(parens(r.Name()) + "*")
 	x.Alts = Or(Con(r, x), Null).toAlts(x)
 	return x
 }
@@ -92,11 +95,4 @@ func (r *R) toAlts(parent *R) Alts {
 		a.Parent = parent
 	})
 	return r.Alts
-}
-
-func parens(s string) string {
-	if strings.HasPrefix(s, "(") && strings.HasSuffix(s, ")") {
-		return s
-	}
-	return "(" + s + ")"
 }

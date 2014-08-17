@@ -42,13 +42,13 @@ func (r *R) traverseRule(m map[*R]bool, visit func(*R)) {
 	}
 }
 
-func (a Alt) last() *R {
+func (a *Alt) last() *R {
 	if len(a.Rules) > 0 {
 		return a.Rules[len(a.Rules)-1]
 	}
 	return nil
 }
 
-func (a Alt) isNull() bool {
+func (a *Alt) isNull() bool {
 	return len(a.Rules) == 1 && a.Rules[0].isNull()
 }

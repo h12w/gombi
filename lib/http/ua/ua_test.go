@@ -30,16 +30,25 @@ var _ = suite.Add(func(s core.S) {
 		r := parser.Results()[0]
 		expect(r.Rule()).Equal(userAgent)
 
-		fmt.Println(r)
-
-		//fmt.Println(strings.Replace(r.String(), "\t", "    ", -1))
-		//next := itemIter(r)
-		//for {
-		//	item := next()
-		//	if item == nil {
-		//		break
-		//	}
-		//}
+		//ps := []*Product{}
+		//var p *Product
+		next := ListIter(r)
+		for {
+			n := next()
+			if n == nil {
+				break
+			}
+			n = n.Child(0) // from (product | comment) to product or comment
+			if n.Is(product) {
+				p := &Product{
+					Name: n.Get(productName),
+					Version: Version{
+						Text: n.Get(productVersion),
+					},
+				}
+				fmt.Println(p)
+			}
+		}
 	})
 })
 

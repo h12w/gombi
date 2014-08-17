@@ -36,14 +36,14 @@ var _ = suite.Add(func(s core.S) {
 		given("simple arithmetic grammar", func() {
 			var (
 				T    = Term("T")
-				Plus = Term("+")
-				Mult = Term("*")
+				Plus = Term(`+`)
+				Mult = Term(`*`)
 				M    = Rule("M", Or(
 					T,
-					Con(Self, Mult, T),
+					Con(Self("M"), Mult, T),
 				))
 				S = Rule("S", Or(
-					Con(Self, Plus, M),
+					Con(Self("S"), Plus, M),
 					M,
 				))
 				P = Rule("P", S, EOF)
@@ -203,8 +203,8 @@ var _ = suite.Add(func(s core.S) {
 				testParse(s, P, TT{
 					tok("A", A),
 				}, `
-			P ::= X EOF•
-				X ::= A•
+			P ::= S EOF•
+				A ::= A•
 				EOF ::= •`)
 			})
 			testcase("short", func() {
@@ -212,9 +212,9 @@ var _ = suite.Add(func(s core.S) {
 					tok("A", A),
 					tok("B", B),
 				}, `
-			P ::= Y EOF•
-				Y ::= X B•
-					X ::= A•
+			P ::= S EOF•
+				Y ::= A B•
+					A ::= A•
 					B ::= B•
 				EOF ::= •`)
 			})

@@ -16,7 +16,7 @@ type Comment struct {
 	Comments []Comment
 }
 
-func ItemIter(n *parse.Node) func() *parse.Node {
+func ListIter(n *parse.Node) func() *parse.Node {
 	cur := n
 	return func() *parse.Node {
 		if cur == nil {

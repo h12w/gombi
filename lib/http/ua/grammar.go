@@ -6,15 +6,17 @@ import (
 )
 
 var (
-	userAgent    = rule("user-agent", or(product, comment).As("item").OneOrMore())
-	product      = rule("product", productToken, con(productSep, productToken).ZeroOrOne())
-	productToken = term("product-token")
-	productSep   = term("/")
-	comment      = rule("comment", leftParen, or(commentText, self).As("cc").ZeroOrMore(), rightParen)
-	leftParen    = term("(")
-	rightParen   = term(")")
-	commentText  = term("ctext")
-	parser       = parse.NewParser(userAgent)
+	userAgent      = rule("user-agent", or(product, comment).OneOrMore())
+	product        = rule("product", productName, con(productSep, productVersion).ZeroOrOne())
+	productName    = rule("product-name", productToken)
+	productVersion = rule("product-version", productToken)
+	productToken   = term("product-token")
+	productSep     = term("/")
+	comment        = rule("comment", leftParen, or(commentText, self("comment")).ZeroOrMore(), rightParen)
+	leftParen      = term(`"("`)
+	rightParen     = term(`")"`)
+	commentText    = term("ctext")
+	parser         = parse.NewParser(userAgent)
 )
 
 const (
