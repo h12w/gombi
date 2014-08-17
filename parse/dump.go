@@ -5,36 +5,45 @@ import (
 	"strings"
 )
 
-func (r *R) expr() string {
-	if r.Name == "" {
+func (r *R) Name() string {
+	if r.name == "" {
 		addr := fmt.Sprintf("%p", r)
 		return "<" + addr[len(addr)-4:] + ">"
 	}
-	return r.Name
+	return r.name
 }
 
 func (r *R) String() string {
-	return fmt.Sprintf("%s ::= %s", r.Name, r.Alts.expr())
+	return fmt.Sprintf("%s ::= %s", r.Name(), r.Alts.String())
 }
 
 func (rs Rules) expr(sep string) string {
 	ss := make([]string, len(rs))
 	for i := range rs {
-		ss[i] = rs[i].expr()
+		ss[i] = rs[i].Name()
 	}
-	return strings.Join(ss, sep)
+	s := strings.Join(ss, sep)
+	return s
 }
 
-func (as Alts) expr() string {
+func (a Alt) String() string {
+	return a.Rules.expr(" ")
+}
+
+func (as Alts) String() string {
 	ss := make([]string, len(as))
 	for i := range as {
-		ss[i] = as[i].expr(" ")
+		ss[i] = as[i].String()
 	}
-	return strings.Join(ss, " | ")
+	s := strings.Join(ss, " | ")
+	if len(as) > 1 {
+		s = parens(s)
+	}
+	return s
 }
 
 func (s *state) name() string {
-	return s.Alt.Parent.expr()
+	return s.Alt.Parent.Name()
 }
 
 func (s *state) expr() string {

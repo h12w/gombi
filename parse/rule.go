@@ -3,7 +3,7 @@ package parse
 type (
 	// R is a BNF production rule
 	R struct {
-		Name string
+		name string
 		//		ID   int
 		Alts
 	}

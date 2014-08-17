@@ -32,11 +32,11 @@ func (r *R) initRecursiveRule(m map[*R]bool, selfValue *R) {
 		if alt.Parent == Self {
 			alt.Parent = selfValue
 		}
-		for i := range alt.Rules {
-			if alt.Rules[i] == Self {
+		for i, cr := range alt.Rules {
+			if cr == Self {
 				alt.Rules[i] = selfValue
 			} else {
-				alt.Rules[i].initRecursiveRule(m, selfValue)
+				cr.initRecursiveRule(m, selfValue)
 			}
 		}
 	}
@@ -46,7 +46,7 @@ func Con(rules ...*R) *R {
 	if len(rules) == 1 {
 		return rules[0]
 	}
-	r := newR().As(Rules(rules).expr(" "))
+	r := newR()
 	r.Alts = Alts{{r, rules}}
 	return r
 }
@@ -55,7 +55,7 @@ func Or(rules ...*R) *R {
 	if len(rules) == 1 {
 		return rules[0]
 	}
-	r := newR().As("(" + Rules(rules).expr("|") + ")")
+	r := newR()
 	r.Alts = make(Alts, len(rules))
 	for i := range rules {
 		r.Alts[i] = rules[i].toAlt(r)
@@ -63,27 +63,27 @@ func Or(rules ...*R) *R {
 	return r
 }
 func (r *R) toAlt(parent *R) *Alt {
-	if len(r.Alts) == 1 {
+	if len(r.Alts) == 1 && r.name == "" {
 		return &Alt{parent, r.Alts[0].Rules}
 	}
 	return &Alt{parent, Rules{r}}
 }
 
 func (r *R) As(name string) *R {
-	r.Name = name
+	r.name = name
 	return r
 }
 
 func (r *R) ZeroOrOne() *R {
-	return Or(r, Null).As(parens(r.Name) + "?")
+	return Or(r, Null).As(parens(r.Name()) + "?")
 }
 
 func (r *R) OneOrMore() *R {
-	return Con(r, r.ZeroOrMore()).As(parens(r.Name) + "+")
+	return Con(r, r.ZeroOrMore()).As(parens(r.Name()) + "+")
 }
 
 func (r *R) ZeroOrMore() *R {
-	x := newR().As(parens(r.Name) + "*")
+	x := newR().As(parens(r.Name()) + "*")
 	x.Alts = Or(Con(r, x), Null).toAlts(x)
 	return x
 }

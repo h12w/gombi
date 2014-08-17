@@ -212,9 +212,10 @@ var _ = suite.Add(func(s core.S) {
 					tok("A", A),
 					tok("B", B),
 				}, `
-			P ::= X B EOF•
-				X ::= A•
-				B ::= B•
+			P ::= Y EOF•
+				Y ::= X B•
+					X ::= A•
+					B ::= B•
 				EOF ::= •`)
 			})
 
