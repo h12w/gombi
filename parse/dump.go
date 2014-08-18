@@ -84,7 +84,7 @@ func (s *state) traverse(level int, visit func(*state, int)) {
 func (ss *stateSet) String() string {
 	strs := make([]string, 0, len(ss.a))
 	for _, s := range ss.a {
-		strs = append(strs, s.String())
+		strs = append(strs, newNode(s).String())
 	}
 	return strings.Join(strs, ", ")
 }
