@@ -6,6 +6,7 @@ type (
 		name string
 		//		ID   int
 		Alts
+		recursive bool
 	}
 	Alt struct {
 		Parent *R

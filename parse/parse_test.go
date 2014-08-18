@@ -46,7 +46,7 @@ var _ = suite.Add(func(s core.S) {
 					Con(Self("S"), Plus, M),
 					M,
 				))
-				P = Rule("P", S, EOF)
+				P = Rule("P", S)
 			)
 			testcase("assotitivity", func() {
 				testParse(s, P, TT{
@@ -59,11 +59,15 @@ var _ = suite.Add(func(s core.S) {
 			P ::= S EOF•
 				S ::= S + M•
 					S ::= S + M•
-						T ::= 1•
+						S ::= M•
+							M ::= T•
+								T ::= 1•
 						+ ::= +•
-						T ::= 2•
+						M ::= T•
+							T ::= 2•
 					+ ::= +•
-					T ::= 3•
+					M ::= T•
+						T ::= 3•
 				EOF ::= •`)
 			})
 			testcase("precedence", func() {
@@ -76,10 +80,13 @@ var _ = suite.Add(func(s core.S) {
 				}, `
 			P ::= S EOF•
 				S ::= S + M•
-					T ::= 2•
+					S ::= M•
+						M ::= T•
+							T ::= 2•
 					+ ::= +•
 					M ::= M * T•
-						T ::= 3•
+						M ::= T•
+							T ::= 3•
 						* ::= *•
 						T ::= 4•
 				EOF ::= •`)
@@ -117,7 +124,8 @@ var _ = suite.Add(func(s core.S) {
 				P ::= AX C EOF•
 					AX ::= A X•
 						A ::= A•
-						B ::= B•
+						X ::= B•
+							B ::= B•
 					C ::= C•
 					EOF ::= •`)
 			})
@@ -154,6 +162,7 @@ var _ = suite.Add(func(s core.S) {
 				}, `
 			P ::= A X C EOF•
 				A ::= A•
+				X ::= B*•
 				C ::= C•
 				EOF ::= •`)
 			})
@@ -166,8 +175,9 @@ var _ = suite.Add(func(s core.S) {
 				}, `
 			P ::= A X C EOF•
 				A ::= A•
-				X ::= B X•
-					B ::= B•
+				X ::= B*•
+					B* ::= B B*•
+						B ::= B•
 				C ::= C•
 				EOF ::= •`)
 			})
@@ -181,10 +191,11 @@ var _ = suite.Add(func(s core.S) {
 				}, `
 			P ::= A X C EOF•
 				A ::= A•
-				X ::= B X•
-					B ::= B•
-					X ::= B X•
+				X ::= B*•
+					B* ::= B B*•
 						B ::= B•
+						B* ::= B B*•
+							B ::= B•
 				C ::= C•
 				EOF ::= •`)
 			})
@@ -204,7 +215,9 @@ var _ = suite.Add(func(s core.S) {
 					tok("A", A),
 				}, `
 			P ::= S EOF•
-				A ::= A•
+				S ::= X•
+					X ::= A•
+						A ::= A•
 				EOF ::= •`)
 			})
 			testcase("short", func() {
@@ -213,9 +226,10 @@ var _ = suite.Add(func(s core.S) {
 					tok("B", B),
 				}, `
 			P ::= S EOF•
-				Y ::= A B•
-					A ::= A•
-					B ::= B•
+				S ::= Y•
+					Y ::= A B•
+						A ::= A•
+						B ::= B•
 				EOF ::= •`)
 			})
 

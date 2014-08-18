@@ -39,6 +39,14 @@ func (n *Node) Is(r *R) bool {
 	return n.Rule() == r
 }
 
+func (n *Node) Each(visit func(*Node)) {
+	cur := n
+	for cur != nil {
+		visit(cur.Child(0))
+		cur = cur.Child(1)
+	}
+}
+
 func (n *Node) Get(r *R) string {
 	s := n.find(r)
 	if s == nil {

@@ -8,9 +8,13 @@ import (
 
 func (r *R) Name() string {
 	if r.name == "" {
+		if r.recursive {
+			addr := fmt.Sprintf("%p", r)
+			return "<" + addr[len(addr)-4:] + ">"
+		}
 		return parens(r.Alts.String())
 	}
-	return r.name
+	return escape(r.name)
 }
 
 func (r *R) String() string {
@@ -49,16 +53,19 @@ func (s *state) name() string {
 func (s *state) String() string {
 	if s.token != nil {
 		if s.d == 0 {
-			return fmt.Sprintf("%s ::= •%v", s.name(), escapeValue(string(s.token.Value)))
+			return fmt.Sprintf("%s ::= •%v", s.name(), escape(string(s.token.Value)))
 		} else if s.d == 1 {
-			return fmt.Sprintf("%s ::= %v•", s.name(), escapeValue(string(s.token.Value)))
+			return fmt.Sprintf("%s ::= %v•", s.name(), escape(string(s.token.Value)))
 		}
 	}
 	return fmt.Sprintf("%s ::= %v•%v", s.name(), s.Alt.Rules[:s.d].toString(" "), s.Alt.Rules[s.d:].toString(" "))
 }
-func escapeValue(v string) string {
-	s := strconv.Quote(v)
-	if !strings.ContainsAny(s, "()|") {
+func escape(s string) string {
+	if strings.HasPrefix(s, `"`) || strings.HasPrefix(s, `(`) {
+		return s
+	}
+	s = strconv.Quote(s)
+	if !strings.ContainsAny(s, " ()|") {
 		s = s[1 : len(s)-1]
 	}
 	return s
@@ -68,13 +75,9 @@ func (s *state) traverse(level int, visit func(*state, int)) {
 	if s == nil {
 		return
 	}
-	if len(s.values) == 1 {
-		s.values[0].traverse(level, visit)
-	} else {
-		visit(s, level)
-		for _, c := range s.values {
-			c.traverse(level+1, visit)
-		}
+	visit(s, level)
+	for _, c := range s.values {
+		c.traverse(level+1, visit)
 	}
 }
 
@@ -97,7 +100,7 @@ func (n *Node) String() string {
 
 func parens(s string) string {
 	if strings.ContainsAny(s, " |") {
-		if !strings.HasPrefix(s, "(") || !strings.HasSuffix(s, ")") {
+		if !strings.HasPrefix(s, "(") {
 			return "(" + s + ")"
 		}
 	}
