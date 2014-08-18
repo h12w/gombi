@@ -9,7 +9,7 @@ import (
 const EOF = 0
 
 type Scanner interface {
-	Init(r io.Reader) error
+	SetReader(r io.Reader) error
 	SetMatcher(m *Matcher)
 	Scan() bool
 	Token() *Token
@@ -25,6 +25,11 @@ type Token struct {
 	ID    int
 	Value []byte
 	Pos   int
+}
+
+func (s *scannerBase) reset() {
+	s.err = nil
+	s.tok = nil
 }
 
 func (s *scannerBase) SetMatcher(m *Matcher) {
@@ -61,12 +66,14 @@ func NewByteScanner(m *Matcher) *ByteScanner {
 	return &ByteScanner{scannerBase: scannerBase{matcher: m}}
 }
 
-func (s *ByteScanner) Init(r io.Reader) error {
+func (s *ByteScanner) SetReader(r io.Reader) error {
 	buf, err := ioutil.ReadAll(r)
 	if err != nil {
 		return err
 	}
+	s.scannerBase.reset()
 	s.buf = buf
+	s.p = 0
 	return nil
 }
 
@@ -102,7 +109,8 @@ func NewUTF8Scanner(m *Matcher) *UTF8Scanner {
 	return &UTF8Scanner{scannerBase: scannerBase{matcher: m}}
 }
 
-func (s *UTF8Scanner) Init(r io.Reader) error {
+func (s *UTF8Scanner) SetReader(r io.Reader) error {
+	s.scannerBase.reset()
 	s.buf = newRuneBuffer(r)
 	return nil
 }

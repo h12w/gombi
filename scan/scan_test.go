@@ -150,10 +150,10 @@ func op(v interface{}) {
 
 func NewUTF8StringScanner(m *Matcher, text string) (Scanner, error) {
 	s := NewUTF8Scanner(m)
-	return s, s.Init(strings.NewReader(text))
+	return s, s.SetReader(strings.NewReader(text))
 }
 
 func NewByteStringScanner(m *Matcher, text string) (Scanner, error) {
 	s := NewByteScanner(m)
-	return s, s.Init(strings.NewReader(text))
+	return s, s.SetReader(strings.NewReader(text))
 }

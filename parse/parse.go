@@ -1,13 +1,18 @@
 package parse
 
 type Parser struct {
+	r         *R
 	cur, next *stateSet
 }
 
 func NewParser(r *R) *Parser {
-	return &Parser{
-		newStateSet(r.appendEOF()),
-		newStateSet(nil)}
+	p := &Parser{r: r}
+	p.Reset()
+	return p
+}
+func (p *Parser) Reset() {
+	p.cur = newStateSet(p.r.appendEOF())
+	p.next = newStateSet(nil)
 }
 func (r *R) appendEOF() *R {
 	for _, a := range r.Alts {
@@ -18,7 +23,11 @@ func (r *R) appendEOF() *R {
 	return r
 }
 
-func (p *Parser) Parse(t *Token, r *R) {
+func (p *Parser) Error() error {
+	return nil
+}
+
+func (p *Parser) Parse(t *Token, r *R) bool {
 	//fmt.Printf("cur set -> %s\n", p.cur.String())
 	p.cur.each(func(s *state) {
 		p.scanPredict(s, newTermState(t, r))
@@ -27,6 +36,7 @@ func (p *Parser) Parse(t *Token, r *R) {
 	//fmt.Printf("next set -> %s\n", p.next.String())
 	//fmt.Println()
 	p.shift()
+	return true
 }
 func (c *Parser) shift() {
 	c.cur, c.next = c.next, c.cur.reset()
