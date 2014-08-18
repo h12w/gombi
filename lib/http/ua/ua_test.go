@@ -1,57 +1,105 @@
 package ua
 
 import (
-	"fmt"
-	"strings"
-	//"strings"
+	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/hailiang/gspec/core"
+	ge "github.com/hailiang/gspec/error"
 	exp "github.com/hailiang/gspec/expectation"
 	"github.com/hailiang/gspec/suite"
+	"github.com/ogdl/flow"
 )
 
-const (
-	firefox = `Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:31.0) Gecko/20100101 Firefox/31.0`
-	ie      = `Mozilla/5.0 (compatible; MSIE 8.0; Windows NT 6.1; Trident/4.0; GTB7.4; InfoPath.2; SV1; .NET CLR 3.3.69573; WOW64; en-US)`
-)
+var testcases = []struct {
+	str string
+	ua  []*Product
+}{
+	{`*Product`, []*Product{
+		{Name: "*Product"},
+	}},
+	{`*Product/1.0`, []*Product{
+		{Name: "*Product",
+			Version: Version{
+				Text: "1.0",
+			}},
+	}},
+	{`()`, []*Product{
+		{},
+	}},
+	{`(text)`, []*Product{
+		{
+			Comment: Comment{
+				Items: []string{"text"},
+			},
+		},
+	}},
+	{`(text; (nested))`, []*Product{
+		{
+			Comment: Comment{
+				Items: []string{"text"},
+				Comments: []Comment{
+					{Items: []string{"nested"}},
+				},
+			},
+		},
+	}},
+	{`Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:31.0) Gecko/20100101 Firefox/31.0`,
+		[]*Product{
+			{
+				Name: "Mozilla",
+				Version: Version{
+					Text: "5.0",
+				},
+				Comment: Comment{
+					Items: []string{"X11", "Ubuntu", "Linux x86_64", "rv:31.0"},
+				},
+			},
+			{
+				Name: "Gecko",
+				Version: Version{
+					Text: "20100101",
+				},
+			},
+			{
+				Name: "Firefox",
+				Version: Version{
+					Text: "31.0",
+				},
+			},
+		},
+	},
+}
 
 var _ = suite.Add(func(s core.S) {
 	testcase := s.Alias("testcase:")
 	expect := exp.Alias(s.FailNow)
-	testcase("firefox", func() {
-		s := newScanner()
-		s.Init(strings.NewReader(firefox))
-		for s.Scan() {
-			parser.Parse(s.parserToken())
-		}
-		expect(s.Error()).Equal(nil)
-		expect(len(parser.Results())).Equal(1)
-		r := parser.Results()[0]
-		expect(r.Rule()).Equal(userAgent)
-
-		//ps := []*Product{}
-		//var p *Product
-		next := ListIter(r)
-		for {
-			n := next()
-			if n == nil {
-				break
-			}
-			n = n.Child(0) // from (product | comment) to product or comment
-			if n.Is(product) {
-				p := &Product{
-					Name: n.Get(productName),
-					Version: Version{
-						Text: n.Get(productVersion),
-					},
-				}
-				fmt.Println(p)
-			}
-		}
-	})
+	for i, tc := range testcases {
+		testcase(strconv.Itoa(i), func() {
+			r, err := ParseUserAgent(tc.str)
+			expect(err).Equal(nil)
+			expect(r).Equal(tc.ua)
+		})
+	}
 })
 
 func TestAll(t *testing.T) {
 	suite.Test(t)
+}
+
+func init() {
+	ge.Sprint = flowPrint
+}
+
+func flowPrint(v interface{}) string {
+	buf, _ := flow.MarshalIndent(v, "    ", "    ")
+	typ := ""
+	if v != nil {
+		typ = reflect.TypeOf(v).String() + "\n"
+	}
+	return "\n" +
+		typ +
+		string(buf) +
+		"\n"
 }

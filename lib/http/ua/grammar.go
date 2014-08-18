@@ -1,12 +1,14 @@
 package ua
 
 import (
+	"io"
+
 	"github.com/hailiang/gombi/parse"
 	"github.com/hailiang/gombi/scan"
 )
 
 var (
-	userAgent      = rule("user-agent", or(product, comment).OneOrMore())
+	userAgent      = rule("user-agent", or(product, comment).As("item").OneOrMore())
 	product        = rule("product", productName, con(productSep, productVersion).ZeroOrOne())
 	productName    = rule("product-name", productToken)
 	productVersion = rule("product-version", productToken)
@@ -17,6 +19,7 @@ var (
 	rightParen     = term(`")"`)
 	commentText    = term("ctext")
 	parser         = parse.NewParser(userAgent)
+	scanner        = newScanner()
 )
 
 const (
@@ -42,7 +45,7 @@ var (
 	})
 )
 
-func newScanner() *scanner {
+func newScanner() *switchScanner {
 	var (
 		c     = scan.Char
 		merge = scan.Merge
@@ -84,24 +87,29 @@ func newScanner() *scanner {
 			commentText,
 		).Map(tLeftParen, tRightParen, tCommentSep, tCommentText)
 
-		scanner = &scanner{scan.NewByteScanner(m), m, mc, 0}
+		scanner = &switchScanner{scan.NewByteScanner(m), m, mc, 0}
 	)
 	return scanner
 }
 
-type scanner struct {
+type switchScanner struct {
 	scan.Scanner
 	m      *scan.Matcher
 	mc     *scan.Matcher
 	clevel int
 }
 
-func (s *scanner) parserToken() (*parse.Token, *parse.R) {
+func (s *switchScanner) parserToken() (*parse.Token, *parse.R) {
 	t := s.Scanner.Token()
 	return &parse.Token{t.Value, t.Pos}, TokenTable[t.ID]
 }
 
-func (s *scanner) Scan() bool {
+func (s *switchScanner) SetReader(r io.Reader) {
+	s.SetMatcher(s.m)
+	s.Scanner.SetReader(r)
+}
+
+func (s *switchScanner) Scan() bool {
 	if s.Scanner.Scan() {
 		switch s.Token().ID {
 		case tLeftParen:

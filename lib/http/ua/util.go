@@ -1,6 +1,12 @@
 package ua
 
-import "github.com/hailiang/gombi/parse"
+import (
+	"fmt"
+	"reflect"
+
+	"github.com/hailiang/gombi/parse"
+	ogdl "github.com/ogdl/flow"
+)
 
 var (
 	term = parse.Term
@@ -9,3 +15,14 @@ var (
 	con  = parse.Con
 	self = parse.Self
 )
+
+func op(v interface{}) {
+	buf, _ := ogdl.MarshalIndent(v, "    ", "    ")
+	typ := ""
+	if v != nil {
+		typ = reflect.TypeOf(v).String() + "\n"
+	}
+	fmt.Println("\n" +
+		typ +
+		string(buf))
+}
