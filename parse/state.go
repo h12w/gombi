@@ -55,24 +55,21 @@ func (s *state) complete() bool {
 	return s.d == len(s.Alt.Rules)
 }
 
-// scan matches t with the expected input. If matched, it records the value,
-// advances itself and returns true, otherwise, returns false.
-func (s *state) scan(t *state) bool {
-	if s.isTerm() {
-		if s.rule() == t.rule() {
-			s.token = t.token
-			s.step()
-			return true
-		}
-	} else if s.nextChildRule() == t.rule() {
-		s.values[s.d] = t
+// not copied because a terminal state can never be a parent of multiple children
+func (s *state) scan(t *Token, r *R) bool {
+	if s.rule() == r {
+		s.token = t
 		s.step()
 		return true
 	}
 	return false
 }
-func (a *Alt) rule() *R {
-	return a.R
+
+// copied because multiple alternatives shares the same parent
+func (s *state) advance(t *state) *state {
+	ns := s.copy()
+	ns.values[s.d] = t
+	return ns.step()
 }
 
 type states struct {
@@ -95,12 +92,7 @@ func (ss *states) each(visit func(*state)) {
 }
 
 type stateSet struct {
-	a []*state
-}
-
-func (ss *stateSet) reset() *stateSet {
-	ss.a = ss.a[:0]
-	return ss
+	states
 }
 
 func (ss *stateSet) add(o, parent *state) (isNew bool) {
@@ -122,10 +114,4 @@ func (ss *stateSet) find(o *state) (*state, bool) {
 		}
 	}
 	return nil, false
-}
-
-func (ss *stateSet) each(visit func(*state)) {
-	for _, s := range ss.a {
-		visit(s)
-	}
 }
