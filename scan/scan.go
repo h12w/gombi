@@ -6,25 +6,30 @@ import (
 	"io/ioutil"
 )
 
-const EOF = 0
-
 type Scanner interface {
 	SetReader(r io.Reader) error
 	SetMatcher(m *Matcher)
+	SetEOF(id int)
 	Scan() bool
 	Token() *Token
 	Error() error
+	String() string
 }
 
 type scannerBase struct {
 	matcher *Matcher
 	err     error
 	tok     *Token
+	eofID   int
 }
 type Token struct {
 	ID    int
 	Value []byte
 	Pos   int
+}
+
+func (s *scannerBase) String() string {
+	return s.matcher.String()
 }
 
 func (s *scannerBase) reset() {
@@ -40,13 +45,17 @@ func (s *scannerBase) Token() *Token {
 	return s.tok
 }
 
-func (s *scannerBase) setEOF(pos int) {
+func (s *scannerBase) reachEOF(pos int) {
 	s.err = io.EOF
 	s.tok = &Token{
-		ID:    EOF,
+		ID:    s.eofID,
 		Value: nil,
 		Pos:   pos,
 	}
+}
+
+func (s *scannerBase) SetEOF(id int) {
+	s.eofID = id
 }
 
 func (s *scannerBase) Error() error {
@@ -85,7 +94,7 @@ func (s *ByteScanner) Scan() bool {
 	id, size := s.matcher.matchBytes(buf)
 	if id == -1 {
 		if s.p == len(s.buf) {
-			s.setEOF(s.p)
+			s.reachEOF(s.p)
 			return true
 		}
 		s.err = invalidInputError(s.matcher, buf)
@@ -123,7 +132,7 @@ func (s *UTF8Scanner) Scan() bool {
 	if id == -1 {
 		if _, _, err := s.buf.ReadRune(); err != nil {
 			if err == io.EOF {
-				s.setEOF(s.buf.p)
+				s.reachEOF(s.buf.p)
 				return true
 			}
 			s.err = err

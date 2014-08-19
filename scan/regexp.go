@@ -16,9 +16,20 @@ func NewMatcher(es ...Expr) *Matcher {
 	return &Matcher{regexp.MustCompile(pat.String()), nil}
 }
 
-func (m *Matcher) Map(ids ...int) *Matcher {
+func NewMapMatcher(mm MM) *Matcher {
+	es := make([]Expr, len(mm))
+	ids := make([]int, len(mm))
+	for i := range mm {
+		es[i], ids[i] = mm[i].Expr, mm[i].ID
+	}
+	m := NewMatcher(es...)
 	m.ids = ids
 	return m
+}
+
+type MM []struct {
+	Expr Expr
+	ID   int
 }
 
 func (m *Matcher) matchBytes(buf []byte) (id, size int) {

@@ -12,6 +12,8 @@ import (
 	//	ogdl "github.com/ogdl/flow"
 )
 
+const EOF = 0
+
 var _ = suite.Add(func(s core.S) {
 	describe, given, it, they, and := suite.Alias5("describe", "given", "it", "they", "and", s)
 	expect := exp.Alias(s.FailNow)

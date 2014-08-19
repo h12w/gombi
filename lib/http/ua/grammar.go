@@ -80,12 +80,12 @@ func newScanner() *switchScanner {
 			LWS,
 			leftParen,
 		)
-		mc = scan.NewMatcher(
-			leftParen,
-			rightParen,
-			commentSep,
-			commentText,
-		).Map(tLeftParen, tRightParen, tCommentSep, tCommentText)
+		mc = scan.NewMapMatcher(scan.MM{
+			{leftParen, tLeftParen},
+			{rightParen, tRightParen},
+			{commentSep, tCommentSep},
+			{commentText, tCommentText},
+		})
 
 		scanner = &switchScanner{scan.NewByteScanner(m), m, mc, 0}
 	)
