@@ -9,7 +9,7 @@ type (
 		recursive bool
 	}
 	Alt struct {
-		Parent *R
+		*R
 		Rules
 	}
 	Rules []*R
@@ -22,6 +22,10 @@ func (r *R) isEOF() bool {
 
 func (r *R) isNull() bool {
 	return r == Null
+}
+
+func (r *R) isTerm() bool {
+	return len(r.Alts) == 1 && len(r.Alts[0].Rules) == 1 && r.Alts[0].Rules[0] == nil
 }
 
 func (r *R) eachAlt(visit func(a *Alt)) {

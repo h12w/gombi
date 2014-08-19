@@ -47,7 +47,7 @@ func (as Alts) String() string {
 }
 
 func (s *state) name() string {
-	return s.Alt.Parent.Name()
+	return s.Alt.R.Name()
 }
 
 func (s *state) String() string {
@@ -86,16 +86,16 @@ func (ss *stateSet) String() string {
 	for _, s := range ss.a {
 		strs = append(strs, newNode(s).String())
 	}
-	return strings.Join(strs, ", ")
+	return strings.Join(strs, "\n")
 }
 
 func (n *Node) String() string {
-	output := "\n"
+	output := ""
 	indent := "\t"
 	n.traverse(0, func(s *state, level int) {
 		output += fmt.Sprintf("%s%s\n", strings.Repeat(indent, level), s.String())
 	})
-	return output
+	return strings.TrimSuffix(output, "\n")
 }
 
 func parens(s string) string {

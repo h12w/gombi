@@ -28,13 +28,9 @@ func newState(alt *Alt) *state {
 
 // newTermState intializes a parsed state for a terminal rule from a token.
 func newTermState(t *Token, r *R) *state {
-	return &state{
-		matchingRule: &matchingRule{
-			Alt:   &Alt{Parent: r},
-			token: t,
-		},
-		d: 1, // a term state is complete already.
-	}
+	s := newState(r.Alts[0])
+	s.token = t
+	return s
 }
 
 func (s *state) copy() *state {
@@ -59,14 +55,16 @@ func (s *state) complete() bool {
 	return s.d == len(s.Alt.Rules)
 }
 
-func (s *state) expect(o *R) bool {
-	return !s.complete() && s.nextChildRule() == o
-}
-
 // scan matches t with the expected input. If matched, it records the value,
 // advances itself and returns true, otherwise, returns false.
 func (s *state) scan(t *state) bool {
-	if s.expect(t.rule()) {
+	if s.isTerm() {
+		if s.rule() == t.rule() {
+			s.token = t.token
+			s.step()
+			return true
+		}
+	} else if s.nextChildRule() == t.rule() {
 		s.values[s.d] = t
 		s.step()
 		return true
@@ -74,19 +72,30 @@ func (s *state) scan(t *state) bool {
 	return false
 }
 func (a *Alt) rule() *R {
-	return a.Parent
+	return a.R
+}
+
+type states struct {
+	a []*state
+}
+
+func (ss *states) reset() states {
+	ss.a = ss.a[:0]
+	return *ss
+}
+
+func (ss *states) append(s *state) {
+	ss.a = append(ss.a, s)
+}
+
+func (ss *states) each(visit func(*state)) {
+	for _, s := range ss.a {
+		visit(s)
+	}
 }
 
 type stateSet struct {
 	a []*state
-}
-
-func newStateSet(r *R) *stateSet {
-	ss := &stateSet{}
-	if r != nil {
-		ss.a = append(ss.a, newState(&Alt{Parent: newR(), Rules: Rules{r}}))
-	}
-	return ss
 }
 
 func (ss *stateSet) reset() *stateSet {

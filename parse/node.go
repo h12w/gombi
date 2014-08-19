@@ -16,7 +16,7 @@ func (n *Node) Alt() *Alt {
 }
 
 func (n *Node) Rule() *R {
-	return n.state.Alt.Parent
+	return n.state.Alt.R
 }
 
 func (n *Node) Child(i int) *Node {
@@ -72,7 +72,7 @@ func (s *state) find(rule *R) *state {
 	return nil
 }
 func (s *state) leaf() *state {
-	if len(s.values) == 0 {
+	if s.isTerm() {
 		return s
 	} else if len(s.values) == 1 {
 		return s.values[0].leaf()

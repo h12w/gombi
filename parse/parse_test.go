@@ -250,7 +250,7 @@ func testParse(s core.S, P *R, tokens TT, expected string) {
 	}
 	results := parser.Results()
 	expect(len(results)).Equal(1)
-	expect(results[0].String()).Equal(unindent(expected + "\n"))
+	expect("\n" + results[0].String()).Equal(unindent(expected))
 }
 
 func unindent(s string) string {

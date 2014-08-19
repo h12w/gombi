@@ -21,8 +21,11 @@ func newR() *R {
 	return &R{}
 }
 
+// TODO should term has an alt?
 func Term(name string) *R {
-	return newR().As(name)
+	r := newR()
+	r.Alts = Alts{{R: r, Rules: Rules{nil}}}
+	return r.As(name)
 }
 
 func Rule(name string, rules ...*R) *R {
@@ -35,18 +38,21 @@ func Rule(name string, rules ...*R) *R {
 }
 func (r *R) wrap() *R {
 	nr := newR()
-	nr.Alts = Alts{{Parent: nr, Rules: Rules{r}}}
+	nr.Alts = Alts{{R: nr, Rules: Rules{r}}}
 	return nr
 }
 func (r *R) initRecursiveRule(m map[*R]bool, selfValue *R) {
+	if r.isTerm() {
+		return
+	}
 	if m[r] {
 		r.recursive = true
 		return
 	}
 	m[r] = true
 	for _, alt := range r.Alts {
-		if alt.Parent == self {
-			alt.Parent = selfValue
+		if alt.R == self {
+			alt.R = selfValue
 		}
 		for i, cr := range alt.Rules {
 			if cr == self {
@@ -111,7 +117,7 @@ func (r *R) ZeroOrMore() *R {
 }
 func (r *R) toAlts(parent *R) Alts {
 	r.eachAlt(func(a *Alt) {
-		a.Parent = parent
+		a.R = parent
 	})
 	return r.Alts
 }
