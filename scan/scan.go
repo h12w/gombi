@@ -50,6 +50,8 @@ func (s *Scanner) Scan() bool {
 			return true
 		}
 		s.err = invalidInputError(buf)
+		s.tok = &Token{Value: buf[:1]}
+		s.p++ // advance 1 byte to avoid indefinate loop
 		return false
 	}
 	s.tok = &Token{

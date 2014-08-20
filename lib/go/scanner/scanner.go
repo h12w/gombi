@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/token"
 	"path/filepath"
+	"unicode/utf8"
 
 	"github.com/hailiang/gombi/scan"
 )
@@ -205,9 +206,17 @@ type Scanner struct {
 	mode Mode         // scanning mode
 }
 
+func skipBOM(buf []byte) []byte {
+	r, size := utf8.DecodeRune(buf)
+	if size > 0 && r == 0xFEFF {
+		buf = buf[size:]
+	}
+	return buf
+}
+
 func (s *Scanner) Init(file *token.File, src []byte, err ErrorHandler, mode Mode) {
 	s.s = scanner
-	s.s.SetBuffer(src)
+	s.s.SetBuffer(skipBOM(src))
 
 	if file.Size() != len(src) {
 		panic(fmt.Sprintf("file size (%d) does not match src len (%d)", file.Size(), len(src)))
@@ -222,6 +231,7 @@ func (s *Scanner) scan() {
 	s.pos = s.s.Pos()
 	if !s.s.Scan() {
 		s.tok = token.ILLEGAL
+		s.val = s.s.Token().Value
 		fmt.Println(s.s.Error()) // DEBUG
 	} else {
 		s.lastTok = s.tok
