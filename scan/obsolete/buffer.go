@@ -66,3 +66,48 @@ func (b *runeBuffer) fill() error {
 	b.buf = buf[:len(buf)+n] // This is correct, err should be handled afterwards.
 	return err
 }
+
+type UTF8Scanner struct {
+	scannerBase
+	buf *runeBuffer
+}
+
+func NewUTF8Scanner(m *Matcher) *UTF8Scanner {
+	return &UTF8Scanner{scannerBase: scannerBase{matcher: m}}
+}
+
+func (s *UTF8Scanner) SetReader(r io.Reader) error {
+	s.scannerBase.reset()
+	s.buf = newRuneBuffer(r)
+	return nil
+}
+
+func (s *UTF8Scanner) Scan() bool {
+	if s.err == io.EOF {
+		return false
+	}
+	id, size := s.matcher.matchReader(s.buf)
+	if id == -1 {
+		if _, _, err := s.buf.ReadRune(); err != nil {
+			if err == io.EOF {
+				s.reachEOF(s.buf.p)
+				return true
+			}
+			s.err = err
+			return false
+		}
+		s.err = invalidInputError(s.matcher, s.buf.bytes())
+		return false
+	}
+	token, pos, err := s.buf.ReadToken(size)
+	if err != nil {
+		s.err = err
+		return false
+	}
+	s.tok = &Token{
+		ID:    id,
+		Value: append([]byte{}, token...),
+		Pos:   pos,
+	}
+	return true
+}

@@ -4,6 +4,7 @@ import (
 	"io"
 	"regexp"
 	"regexp/syntax"
+	"unicode"
 )
 
 type Matcher struct {
@@ -64,8 +65,16 @@ func (r rxSyntax) isCharSet() bool {
 	return r.Op == syntax.OpCharClass
 }
 
-func parse(p string) *syntax.Regexp {
-	r, err := syntax.Parse(p, syntax.MatchNL|syntax.UnicodeGroups|syntax.PerlX)
+func parsePat(p string) *syntax.Regexp {
+	r, err := syntax.Parse(p, syntax.ClassNL|syntax.DotNL|syntax.MatchNL|syntax.PerlX|syntax.UnicodeGroups)
+	if err != nil {
+		panic(err)
+	}
+	return r
+}
+
+func parseStr(p string) *syntax.Regexp {
+	r, err := syntax.Parse(p, syntax.Literal)
 	if err != nil {
 		panic(err)
 	}
@@ -75,7 +84,14 @@ func parse(p string) *syntax.Regexp {
 func singleLiteralToCharClass(rx *syntax.Regexp) {
 	if rx.Op == syntax.OpLiteral && len(rx.Rune) == 1 {
 		char := rx.Rune[0]
-		rx.Rune = []rune{char, char}
+		if rx.Flags&syntax.FoldCase != 0 && unicode.ToLower(char) != unicode.ToUpper(char) {
+			l, h := unicode.ToLower(char), unicode.ToUpper(char)
+			rx.Rune = []rune{h, h, l, l}
+			rx.Rune0 = [...]rune{h, h}
+		} else {
+			rx.Rune = []rune{char, char}
+			rx.Rune0 = [...]rune{char, char}
+		}
 		rx.Op = syntax.OpCharClass
 	}
 }

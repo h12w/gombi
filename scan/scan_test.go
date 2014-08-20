@@ -62,12 +62,23 @@ var _ = suite.Add(func(s core.S) {
 				expect(c.Exclude(Char(`bd`)).String()).Equal(`[ace]`)
 			})
 		})
-		given("a chacter set with a single element (OpLiteral)", func() {
+		given("a character set with a single element (OpLiteral)", func() {
 			a := Char(`a`)
 			it("can be negated", func() {
 				na := a.Negate()
 				expect(na.String()).Equal(`[^a]`)
 				expect(na.Negate().String()).Equal(`[a]`)
+			})
+		})
+		given("a character set with an letter of upper and lower case (OpLiteral)", func() {
+			x := Char(`xX`)
+			it("has a canonical form of character set", func() {
+				expect(x.String()).Equal(`[Xx]`)
+			})
+			it("can be negated", func() {
+				nx := x.Negate()
+				expect(nx.String()).Equal(`[^Xx]`)
+				expect(nx.Negate().String()).Equal(`[Xx]`)
 			})
 		})
 		given("multiple character sets", func() {
@@ -84,47 +95,42 @@ var _ = suite.Add(func(s core.S) {
 		a := Char(`a`)
 		s := Char(` `)
 		b := Char(`b`)
-		testScanner := func(scanner Scanner) {
-			expect(scanner.Scan()).Equal(true)
-			expect(scanner.Error()).Equal(nil)
-			expect(scanner.Token()).Equal(
-				&Token{
-					ID:    3,
-					Value: []byte("b"),
-					Pos:   0,
-				})
-			expect(scanner.Scan()).Equal(true)
-			expect(scanner.Error()).Equal(nil)
-			expect(scanner.Token()).Equal(
-				&Token{
-					ID:    2,
-					Value: []byte(" "),
-					Pos:   1,
-				})
-			expect(scanner.Scan()).Equal(true)
-			expect(scanner.Error()).Equal(nil)
-			expect(scanner.Token()).Equal(
-				&Token{
-					ID:    1,
-					Value: []byte("a"),
-					Pos:   2,
-				})
-			expect(scanner.Scan()).Equal(true)
-			expect(scanner.Error()).Equal(nil)
-			expect(scanner.Token()).Equal(
-				&Token{
-					ID:    EOF,
-					Value: nil,
-					Pos:   3,
-				})
-			expect(scanner.Scan()).Equal(false)
-			expect(scanner.Error()).Equal(nil)
-		}
 		m := NewMatcher(a, s, b)
-		byteScanner, _ := NewByteStringScanner(m, "b a")
-		testScanner(byteScanner)
-		utf8Scanner, _ := NewUTF8StringScanner(m, "b a")
-		testScanner(utf8Scanner)
+		scanner, _ := NewStringScanner(m, "b a")
+		expect(scanner.Scan()).Equal(true)
+		expect(scanner.Error()).Equal(nil)
+		expect(scanner.Token()).Equal(
+			&Token{
+				ID:    3,
+				Value: []byte("b"),
+				Pos:   0,
+			})
+		expect(scanner.Scan()).Equal(true)
+		expect(scanner.Error()).Equal(nil)
+		expect(scanner.Token()).Equal(
+			&Token{
+				ID:    2,
+				Value: []byte(" "),
+				Pos:   1,
+			})
+		expect(scanner.Scan()).Equal(true)
+		expect(scanner.Error()).Equal(nil)
+		expect(scanner.Token()).Equal(
+			&Token{
+				ID:    1,
+				Value: []byte("a"),
+				Pos:   2,
+			})
+		expect(scanner.Scan()).Equal(true)
+		expect(scanner.Error()).Equal(nil)
+		expect(scanner.Token()).Equal(
+			&Token{
+				ID:    EOF,
+				Value: nil,
+				Pos:   3,
+			})
+		expect(scanner.Scan()).Equal(false)
+		expect(scanner.Error()).Equal(nil)
 	})
 })
 
@@ -150,12 +156,7 @@ func op(v interface{}) {
 }
 */
 
-func NewUTF8StringScanner(m *Matcher, text string) (Scanner, error) {
-	s := NewUTF8Scanner(m)
-	return s, s.SetReader(strings.NewReader(text))
-}
-
-func NewByteStringScanner(m *Matcher, text string) (Scanner, error) {
-	s := NewByteScanner(m)
+func NewStringScanner(m *Matcher, text string) (*Scanner, error) {
+	s := NewScanner(m)
 	return s, s.SetReader(strings.NewReader(text))
 }

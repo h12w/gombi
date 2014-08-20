@@ -7,8 +7,11 @@ type Pattern struct {
 }
 
 func Pat(pat string) Pattern {
-	p := Pattern{rxSyntax{parse(pat)}}
-	return p
+	return Pattern{rxSyntax{parsePat(pat)}}
+}
+
+func Str(str string) Pattern {
+	return Pattern{rxSyntax{parseStr(str)}}
 }
 
 func (p Pattern) ZeroOrOne() Pattern {
@@ -22,6 +25,14 @@ func (p Pattern) ZeroOrMore() Pattern {
 	var w exprWriter
 	w.group(p)
 	w.WriteByte('*')
+	return w.pat()
+}
+
+func (p Pattern) Ungreedy() Pattern {
+	var w exprWriter
+	w.WriteString("(?U:")
+	w.WriteString(p.String())
+	w.WriteByte(')')
 	return w.pat()
 }
 
@@ -52,12 +63,4 @@ func Con(es ...Expr) Pattern {
 		w.group(e)
 	}
 	return w.pat()
-}
-
-func OrPat(ss ...string) Pattern {
-	es := make(exprs, len(ss))
-	for i := range ss {
-		es[i] = Pat(ss[i])
-	}
-	return Or(es...)
 }
