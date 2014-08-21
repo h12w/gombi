@@ -157,6 +157,6 @@ func op(v interface{}) {
 */
 
 func NewStringScanner(m *Matcher, text string) (*Scanner, error) {
-	s := NewScanner(m)
-	return s, s.SetReader(strings.NewReader(text))
+	s := Scanner{Matcher: m}
+	return &s, s.SetReader(strings.NewReader(text))
 }
