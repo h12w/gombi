@@ -14,6 +14,10 @@ func Str(str string) Pattern {
 	return Pattern{rxSyntax{parseStr(str)}}
 }
 
+func (p Pattern) simplify() Pattern {
+	return Pattern{rxSyntax{p.Simplify()}}
+}
+
 func (p Pattern) ZeroOrOne() Pattern {
 	var w exprWriter
 	w.group(p)

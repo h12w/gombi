@@ -7,6 +7,8 @@ import (
 	"unicode"
 )
 
+const batchSize = 1024
+
 type Matcher struct {
 	*regexp.Regexp
 	ids []int
@@ -34,18 +36,32 @@ type MM []struct {
 }
 
 func (m *Matcher) matchBytes(buf []byte) (id, size int) {
-	return m.result(m.FindSubmatchIndex(buf))
+	return m.result(m.FindSubmatchIndex(buf), 0)
+}
+
+func (m *Matcher) scanBatch(buf []byte, start int) []Token {
+	rs := m.FindAllSubmatchIndex(buf, batchSize)
+	toks := make([]Token, len(rs))
+	p := 0
+	for i, match := range rs {
+		id, size := m.result(match, p)
+		toks[i].ID = id
+		toks[i].Value = buf[p : p+size]
+		toks[i].Pos = start + p
+		p += size
+	}
+	return toks
 }
 
 func (m *Matcher) matchReader(r io.RuneReader) (id, size int) {
-	return m.result(m.FindReaderSubmatchIndex(r))
+	return m.result(m.FindReaderSubmatchIndex(r), 0)
 }
 
-func (m *Matcher) result(match []int) (id, size int) {
+func (m *Matcher) result(match []int, start int) (id, size int) {
 	if match != nil {
 		for i := 2; i < len(match)-1; i += 2 {
-			if match[i] != -1 {
-				size = match[i+1] // m[i] must be 0
+			if match[i] == start {
+				size = match[i+1] - match[i] // m[i] must be 0
 				id = i / 2
 				if m.ids != nil {
 					id = m.ids[id-1]

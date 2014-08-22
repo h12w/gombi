@@ -15,7 +15,7 @@ func (es exprs) capture(captured bool) Pattern {
 			w.WriteByte('|')
 		}
 		if captured {
-			w.capture(e)
+			w.capture(Pat(e.String()).simplify())
 		} else {
 			w.group(e)
 		}
