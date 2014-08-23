@@ -1,10 +1,23 @@
-package re
+package scan
 
 import (
 	"fmt"
 	"testing"
 
 	"github.com/hailiang/gspec"
+)
+
+var (
+	c          = Char
+	b          = Between
+	merge      = Merge
+	s          = Str
+	con        = Con
+	or         = Or
+	zeroOrOne  = ZeroOrOne
+	zeroOrMore = ZeroOrMore
+	oneOrMore  = OneOrMore
+	repeat     = Repeat
 )
 
 func TestExpr(t *testing.T) {
