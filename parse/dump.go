@@ -99,7 +99,7 @@ func (n *Node) String() string {
 }
 
 func parens(s string) string {
-	if strings.ContainsAny(s, " |") {
+	if strings.ContainsAny(s, "|") {
 		if !strings.HasPrefix(s, "(") {
 			return "(" + s + ")"
 		}

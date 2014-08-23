@@ -56,14 +56,15 @@ var (
 	imaginaryLit         = con(or(decimals, floatLit), c(`i`))
 	runeLit              = con(c(`'`), or(unicodeValue, byteValue), c(`'`))
 	unicodeValue         = or(unicodeChar, littleUValue, bigUValue, escapedChar)
+	unicodeStrValue      = or(unicodeChar.Exclude(c(`"`)), littleUValue, bigUValue, escapedChar)
 	byteValue            = or(octalByteValue, hexByteValue)
 	octalByteValue       = con(s(`\`), octalDigit.Repeat(3))
 	hexByteValue         = con(s(`\x`), hexDigit.Repeat(2))
 	littleUValue         = con(s(`\u`), hexDigit.Repeat(4))
 	bigUValue            = con(s(`\U`), hexDigit.Repeat(8))
 	escapedChar          = con(s(`\`), c(`abfnrtv\\'"`))
-	rawStringLit         = con(s("`"), or(unicodeChar, newline).ZeroOrMore().Ungreedy(), s("`"))
-	interpretedStringLit = con(s(`"`), or(unicodeValue, byteValue).ZeroOrMore().Ungreedy(), s(`"`))
+	rawStringLit         = con(s("`"), or(unicodeChar.Exclude(c("`")), newline).ZeroOrMore(), s("`"))
+	interpretedStringLit = con(s(`"`), or(unicodeStrValue, byteValue).ZeroOrMore(), s(`"`))
 
 	matcher = scan.NewMapMatcher(scan.MM{
 		{newline, tNewline},
