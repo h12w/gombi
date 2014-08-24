@@ -1,76 +1,65 @@
 package scan
 
 import (
-	"io"
 	"regexp"
 	"regexp/syntax"
 	"unicode"
 )
 
-const batchSize = 1024
+/*
+Things that have been tried but is worse (from slow to even slower):
+1. Use a large expression to capture each alterantive submatch (FindSubmatchIndex) like:
+   \A(?:(token1)|(token2)\(token3))
+
+2. Find consecutive tokens all at once (FindAllSubmatchIndex):
+	(token1)|(token2)\(token3)
+*/
 
 type Matcher struct {
-	*regexp.Regexp
-	ids []int
+	Defs    []*IDMatcher
+	EOF     int
+	Illegal int
 }
 
 func NewMatcher(es ...Expr) *Matcher {
-	pat := Con(Pat(`\A`), exprs(es).capture(true))
-	return &Matcher{regexp.MustCompile(pat.String()), nil}
+	defs := make([]*IDMatcher, len(es))
+	for i := range es {
+		defs[i] = &IDMatcher{
+			regexp.MustCompile(Con(Pat(`\A`), es[i]).String()),
+			i + 1}
+	}
+	return &Matcher{Defs: defs}
 }
 
 func NewMapMatcher(mm MM) *Matcher {
-	es := make([]Expr, len(mm))
-	ids := make([]int, len(mm))
+	defs := make([]*IDMatcher, len(mm))
 	for i := range mm {
-		es[i], ids[i] = mm[i].Expr, mm[i].ID
+		defs[i] = &IDMatcher{
+			regexp.MustCompile(Con(Pat(`\A`), mm[i].Expr).String()),
+			mm[i].ID}
 	}
-	m := NewMatcher(es...)
-	m.ids = ids
-	return m
+	return &Matcher{Defs: defs}
 }
 
 type MM []struct {
 	Expr Expr
 	ID   int
 }
+type IDMatcher struct {
+	*regexp.Regexp
+	ID int
+}
 
 func (m *Matcher) matchBytes(buf []byte) (id, size int) {
-	return m.result(m.FindSubmatchIndex(buf), 0)
-}
-
-func (m *Matcher) scanBatch(buf []byte, start int) []Token {
-	rs := m.FindAllSubmatchIndex(buf, batchSize)
-	toks := make([]Token, len(rs))
-	p := 0
-	for i, match := range rs {
-		id, size := m.result(match, p)
-		toks[i].ID = id
-		toks[i].Value = buf[p : p+size]
-		toks[i].Pos = start + p
-		p += size
+	if len(buf) == 0 {
+		return m.EOF, 0
 	}
-	return toks
-}
-
-func (m *Matcher) matchReader(r io.RuneReader) (id, size int) {
-	return m.result(m.FindReaderSubmatchIndex(r), 0)
-}
-
-func (m *Matcher) result(match []int, start int) (id, size int) {
-	if match != nil {
-		for i := 2; i < len(match)-1; i += 2 {
-			if match[i] == start {
-				size = match[i+1] - match[i] // m[i] must be 0
-				id = i / 2
-				if m.ids != nil {
-					id = m.ids[id-1]
-				}
-				return id, size
-			}
+	for _, d := range m.Defs {
+		if loc := d.Regexp.FindIndex(buf); loc != nil {
+			return d.ID, loc[1]
 		}
 	}
-	return -1, 0
+	return m.Illegal, 1
 }
 
 type rxSyntax struct {

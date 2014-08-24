@@ -9,8 +9,6 @@ import (
 
 type Scanner struct {
 	*Matcher
-	EOF     int
-	Illegal int
 
 	src []byte
 	p   int
@@ -25,41 +23,19 @@ type Token struct {
 	Pos   int
 }
 
-func (s *Scanner) ScanBatch() bool {
-	if s.err == io.EOF {
-		return false
-	}
-	buf := s.src[s.p:]
-	if len(s.toks) == 0 {
-		s.toks = s.scanBatch(buf, s.p)
-	}
-	if len(s.toks) > 0 {
-		s.tok, s.toks = &s.toks[0], s.toks[1:]
-		s.p += len(s.tok.Value)
-		return true
-	} else {
-		if s.p == len(s.src) {
-			s.reachEOF(s.p)
-			return true
-		}
-		s.err = invalidInputError(buf)
-		s.tok = &Token{ID: s.Illegal, Value: buf[:1], Pos: s.p}
-		s.p++ // advance 1 byte to avoid indefinate loop
-		return false
-	}
-}
-
 func (s *Scanner) Scan() bool {
 	if s.err == io.EOF {
 		return false
 	}
 	buf := s.src[s.p:]
 	id, size := s.Matcher.matchBytes(buf)
-	if id == -1 {
+	switch id {
+	case s.EOF:
 		if s.p == len(s.src) {
 			s.reachEOF(s.p)
 			return true
 		}
+	case s.Illegal:
 		s.err = invalidInputError(buf)
 		s.tok = &Token{ID: s.Illegal, Value: buf[:1], Pos: s.p}
 		s.p++ // advance 1 byte to avoid indefinate loop

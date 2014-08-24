@@ -5,18 +5,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hailiang/gspec/core"
-	exp "github.com/hailiang/gspec/expectation"
-	"github.com/hailiang/gspec/suite"
+	"github.com/hailiang/gspec"
 
 	//	ogdl "github.com/ogdl/flow"
 )
 
 const EOF = 0
 
-var _ = suite.Add(func(s core.S) {
-	describe, given, it, they, and := suite.Alias5("describe", "given", "it", "they", "and", s)
-	expect := exp.Alias(s.FailNow)
+var _ = gspec.Add(func(s gspec.S) {
+	describe, given, it, they, and := gspec.Alias5("describe", "given", "it", "they", "and", s)
+	expect := gspec.Expect(s.FailNow)
 	describe("patterns", func() {
 		given("a pattern", func() {
 			a := Pat("ab")
@@ -135,7 +133,7 @@ var _ = suite.Add(func(s core.S) {
 })
 
 func TestAll(t *testing.T) {
-	suite.Test(t)
+	gspec.Test(t)
 }
 
 func pp(v ...interface{}) {
