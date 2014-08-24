@@ -1,7 +1,7 @@
 package scan
 
 type TokenMatcher struct {
-	Defs    []IDMatcher
+	Defs    []*IDMatcher
 	EOF     int
 	Illegal int
 }

@@ -25,7 +25,28 @@ func escapeLiteral(r rune) string {
 func (s *CharSet) String() string {
 	var w bytes.Buffer
 	w.WriteByte('[')
-	for _, r := range s.ranges {
+	rs := runes{}
+	for b := byte(0); b < RuneSelf; b++ {
+		if s.a.contains(b) {
+			rs = append(rs, rune(b))
+		}
+	}
+	rs = append(rs, s.u.toRunes()...)
+	w.WriteString(rs.toUnicodeSet().String())
+	w.WriteByte(']')
+	return w.String()
+}
+func (s unicodeSet) toRunes() (rs runes) {
+	for _, rr := range s {
+		for r := rr.s; r <= rr.e; r++ {
+			rs = append(rs, r)
+		}
+	}
+	return rs
+}
+func (s unicodeSet) String() string {
+	var w bytes.Buffer
+	for _, r := range s {
 		if r.s == r.e {
 			w.WriteString(escapeCharset(r.s))
 		} else {
@@ -34,7 +55,6 @@ func (s *CharSet) String() string {
 			w.WriteString(escapeCharset(r.e))
 		}
 	}
-	w.WriteByte(']')
 	return w.String()
 }
 func escapeCharset(r rune) string {

@@ -10,11 +10,14 @@ const maxInt = 1<<31 - 1
 
 type (
 	CharSet struct {
-		ranges []runeRange
+		a asciiSet
+		u unicodeSet
 	}
 	runeRange struct { // rune range
 		s, e rune
 	}
+	asciiSet   [2]uint64
+	unicodeSet []runeRange
 
 	Literal struct {
 		a []byte
@@ -35,18 +38,40 @@ type (
 		max      int
 	}
 
-	runes      []rune
-	runeRanges []runeRange
+	runes []rune
 )
 
 func Char(s string) *CharSet {
-	return &CharSet{runes(s).toRanges()}
+	rs := runes(s)
+	sort.Sort(rs)
+	return &CharSet{rs.asciiRunes().toAsciiSet(), rs.unicodeRunes().toUnicodeSet()}
 }
-func (rs runes) toRanges() (rr []runeRange) {
+func (rs runes) asciiRunes() runes {
+	for i, r := range rs {
+		if r >= RuneSelf {
+			return rs[:i]
+		}
+	}
+	return rs
+}
+func (rs runes) unicodeRunes() runes {
+	for i, r := range rs {
+		if r >= RuneSelf {
+			return rs[i:]
+		}
+	}
+	return nil
+}
+func (rs runes) toAsciiSet() (a asciiSet) {
+	for _, r := range rs {
+		a.add(byte(r))
+	}
+	return
+}
+func (rs runes) toUnicodeSet() (rr unicodeSet) {
 	if len(rs) == 0 {
 		return nil
 	}
-	sort.Sort(rs)
 	rr = append(rr, runeRange{s: rs[0]})
 	cur := rs[0]
 	for i := 1; i < len(rs); i++ {
@@ -63,15 +88,16 @@ func (rs runes) Len() int           { return len(rs) }
 func (rs runes) Less(i, j int) bool { return rs[i] < rs[j] }
 func (rs runes) Swap(i, j int)      { rs[i], rs[j] = rs[j], rs[i] }
 
-func Between(s, e rune) *CharSet {
+func Between(s, e byte) *CharSet {
 	if s > e {
 		s, e = e, s
 	}
-	return &CharSet{[]runeRange{{s, e}}}
+	var a asciiSet
+	for b := s; b <= e; b++ {
+		a.add(b)
+	}
+	return &CharSet{a: a}
 }
-
-//func Set(name string) *CharSet {
-//}
 
 func Str(s string) *Literal {
 	return &Literal{[]byte(s)}
@@ -86,17 +112,19 @@ func Or(ms ...Matcher) *Choice {
 }
 
 func Merge(cs ...*CharSet) *CharSet {
-	rrs := make(runeRanges, 0)
+	var a asciiSet
+	rrs := make(unicodeSet, 0)
 	for _, c := range cs {
-		rrs = append(rrs, runeRanges(c.ranges)...)
+		a.merge(&c.a)
+		rrs = append(rrs, unicodeSet(c.u)...)
 	}
 	sort.Sort(rrs)
-	return &CharSet{rrs.simplify()}
+	return &CharSet{a: a, u: rrs.simplify()}
 }
-func (rs runeRanges) Len() int           { return len(rs) }
-func (rs runeRanges) Less(i, j int) bool { return rs[i].s < rs[j].s }
-func (rs runeRanges) Swap(i, j int)      { rs[i], rs[j] = rs[j], rs[i] }
-func (rs runeRanges) simplify() runeRanges {
+func (rs unicodeSet) Len() int           { return len(rs) }
+func (rs unicodeSet) Less(i, j int) bool { return rs[i].s < rs[j].s }
+func (rs unicodeSet) Swap(i, j int)      { rs[i], rs[j] = rs[j], rs[i] }
+func (rs unicodeSet) simplify() unicodeSet {
 	if len(rs) < 2 {
 		return rs
 	}
@@ -112,10 +140,10 @@ func (rs runeRanges) simplify() runeRanges {
 }
 
 func (s *CharSet) Negate() *CharSet {
-	return &CharSet{runeRanges(s.ranges).negate()}
+	return &CharSet{s.a.negate(), unicodeSet(s.u).negate()}
 }
-func (rs runeRanges) negate() (neg []runeRange) {
-	min := rune(0)
+func (rs unicodeSet) negate() (neg unicodeSet) {
+	min := rune(RuneSelf)
 	for _, r := range rs {
 		s, e := r.s, r.e
 		if min < s {
@@ -152,4 +180,23 @@ func Repeat(m Matcher, n int) *Repetition {
 func (r *Repetition) EndWith(sentinel Matcher) *Repetition {
 	r.sentinel = sentinel
 	return r
+}
+
+func (r *asciiSet) add(b byte) {
+	if b < 64 {
+		r[0] |= (1 << b)
+	}
+	r[1] |= (1 << (b - 64))
+}
+
+func (r *asciiSet) merge(o *asciiSet) {
+	(*r)[0] |= (*o)[0]
+	(*r)[1] |= (*o)[1]
+}
+
+func (r *asciiSet) negate() asciiSet {
+	neg := *r
+	neg[0] = ^neg[0]
+	neg[1] = ^neg[1]
+	return neg
 }

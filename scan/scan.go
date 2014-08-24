@@ -12,7 +12,7 @@ type Scanner struct {
 	src []byte
 	p   int
 
-	tok *Token
+	tok Token
 	err error
 }
 type Token struct {
@@ -28,11 +28,9 @@ func (s *Scanner) Scan() bool {
 
 	buf := s.src[s.p:]
 	id, size := s.Matcher.Match(buf)
-	s.tok = &Token{
-		ID:    id,
-		Value: buf[:size],
-		Pos:   s.p,
-	}
+	s.tok.ID = id
+	s.tok.Value = buf[:size]
+	s.tok.Pos = s.p
 	s.p += size
 
 	switch id {
@@ -57,7 +55,7 @@ func prefix(buf []byte, i int) []byte {
 func (s *Scanner) SetSource(src []byte) {
 	s.src = src
 	s.p = 0
-	s.tok = nil
+	s.tok = Token{}
 	s.err = nil
 }
 
@@ -66,7 +64,7 @@ func (s *Scanner) Pos() int {
 }
 
 func (s *Scanner) Token() *Token {
-	return s.tok
+	return &s.tok
 }
 
 func (s *Scanner) Error() error {

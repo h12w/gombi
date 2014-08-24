@@ -75,7 +75,7 @@ var (
 	matcher = &scan.TokenMatcher{
 		EOF:     int(token.EOF),
 		Illegal: int(token.ILLEGAL),
-		Defs: []scan.IDMatcher{
+		Defs: []*scan.IDMatcher{
 			{whitespaces, tWhitespace},
 			{newline, tNewline},
 			{s(`if`), int(token.IF)},
