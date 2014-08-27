@@ -77,7 +77,7 @@ var (
 		Illegal: int(token.ILLEGAL),
 		Defs: []*scan.IDMatcher{
 			{whitespaces, tWhitespace},
-			{newline, tNewline},
+			{s("\n"), tNewline},
 			{s(`if`), int(token.IF)},
 			{s(`break`), int(token.BREAK)},
 			{s(`case`), int(token.CASE)},
