@@ -95,7 +95,7 @@ func (n *Node) String() string {
 	n.traverse(0, func(s *state, level int) {
 		output += fmt.Sprintf("%s%s\n", strings.Repeat(indent, level), s.String())
 	})
-	return strings.TrimSuffix(output, "\n")
+	return output
 }
 
 func parens(s string) string {

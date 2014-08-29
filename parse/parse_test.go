@@ -1,12 +1,9 @@
 package parse
 
 import (
-	"strings"
 	"testing"
 
-	"github.com/hailiang/gspec/core"
-	exp "github.com/hailiang/gspec/expectation"
-	"github.com/hailiang/gspec/suite"
+	"github.com/hailiang/gspec"
 )
 
 type testScanner struct {
@@ -28,8 +25,8 @@ func (s *testScanner) Token() (*Token, *R) {
 	return t.t, t.r
 }
 
-var _ = suite.Add(func(s core.S) {
-	describe, testcase, given := suite.Alias3("describe", "testcase:", "given", s)
+var _ = gspec.Add(func(s gspec.S) {
+	describe, testcase, given := gspec.Alias3("describe", "testcase:", "given", s)
 
 	describe("the parser", func() {
 
@@ -238,11 +235,11 @@ var _ = suite.Add(func(s core.S) {
 })
 
 func TestAll(t *testing.T) {
-	suite.Test(t)
+	gspec.Test(t)
 }
 
-func testParse(s core.S, P *R, tokens TT, expected string) {
-	expect := exp.Alias(s.FailNow, 1)
+func testParse(s gspec.S, P *R, tokens TT, expected string) {
+	expect := gspec.Expect(s.FailNow, 1)
 	scanner := newTestScanner(append(tokens, tok("", EOF)))
 	parser := NewParser(P)
 	for scanner.Scan() {
@@ -250,32 +247,7 @@ func testParse(s core.S, P *R, tokens TT, expected string) {
 	}
 	results := parser.Results()
 	expect(len(results)).Equal(1)
-	expect("\n" + results[0].String()).Equal(unindent(expected))
-}
-
-func unindent(s string) string {
-	lines := strings.Split(s, "\n")
-	indent := ""
-	done := false
-	for _, line := range lines {
-		if strings.TrimSpace(line) != "" {
-			for _, r := range line {
-				if r == ' ' || r == '\t' {
-					indent += string(r)
-				} else {
-					done = true
-					break
-				}
-			}
-		}
-		if done {
-			break
-		}
-	}
-	for i := range lines {
-		lines[i] = strings.TrimPrefix(lines[i], indent)
-	}
-	return strings.Join(lines, "\n")
+	expect("\n" + results[0].String()).Equal(gspec.Unindent(expected))
 }
 
 type testToken struct {
