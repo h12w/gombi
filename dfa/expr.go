@@ -2,19 +2,19 @@ package dfa
 
 func Str(s string) *machine {
 	bs := []byte(s)
-	ss := make([]state, len(bs)+1)
-	for i := range bs {
-		ss[i].set(bs[i], stateID(i+1))
+	ss := make(states, 0, len(bs)+1)
+	for i, b := range bs {
+		ss = append(ss, stateTo(b, stateID(i+1)))
 	}
-	ss[len(ss)-1].label = defaultFinal
+	ss = append(ss, finalState())
 	return &machine{ss}
 }
 
 func Between(s, e byte) *machine {
-	ss := make([]state, 2)
-	ss[0].setBetween(s, e, 1)
-	ss[1].label = defaultFinal
-	return &machine{ss}
+	return &machine{states{
+		stateBetween(s, e, 1),
+		finalState(),
+	}}
 }
 
 // TODO: unicode
@@ -23,10 +23,10 @@ func Char(s string) *machine {
 	for i := range s {
 		a.set(s[i], 1)
 	}
-	ss := make([]state, 2)
-	ss[0].tt = a.toTransTable()
-	ss[1].label = defaultFinal
-	return &machine{ss}
+	return &machine{states{
+		a.toState(),
+		finalState(),
+	}}
 }
 
 func Con(ms ...*machine) *machine {
@@ -41,16 +41,15 @@ func Con(ms ...*machine) *machine {
 }
 func con2(m1, m2 *machine) *machine {
 	m := m1.clone()
-	m2 = m2.clone().shiftID(m.stateCount() - 1)
-	m.each(func(s *state) {
-		if s.final() {
-			s.connect(&m2.ss[0])
-			if !m2.ss[0].final() {
-				s.label = notFinal
-			}
+	m2 = m2.clone()
+	m2.shiftID(m.states.count() - 1)
+	m.eachFinal(func(f *state) {
+		f.connect(m2.startState())
+		if !m2.startState().final() {
+			f.label = notFinal
 		}
 	})
-	m.ss = append(m.ss, m2.ss[1:]...)
+	m.states = append(m.states, m2.states[1:]...)
 	return m
 }
 
@@ -64,27 +63,24 @@ func Or(ms ...*machine) *machine {
 	}
 	return m
 }
-
 func or2(m1, m2 *machine) *machine {
 	return newMerger(m1, m2).merge()
 }
 
 func ZeroOrMore(m *machine) *machine {
 	m = OneOrMore(m)
-	if len(m.ss) == 2 {
-		m.ss = m.ss[1:]
+	if len(m.states) == 2 {
+		m.states = m.states[1:]
 		m.shiftID(-1)
 	}
-	m.ss[0].label = defaultFinal
+	m.startState().label = defaultFinal
 	return m
 }
 
 func OneOrMore(m *machine) *machine {
 	m = m.clone()
-	m.each(func(s *state) {
-		if s.final() {
-			s.connect(&m.ss[0])
-		}
+	m.eachFinal(func(f *state) {
+		f.connect(m.startState())
 	})
 	return m
 }

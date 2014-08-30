@@ -22,7 +22,7 @@ func newMerger(m1, m2 *machine) *merger {
 func (q *merger) merge() *machine {
 	for q.l.Len() > 0 {
 		id, id1, id2 := q.get()
-		q.m.ss[id] = q.mergeState(q.m1.state(id1), q.m2.state(id2))
+		q.m.states[id] = q.mergeState(q.m1.state(id1), q.m2.state(id2))
 	}
 	return q.m
 }
@@ -82,13 +82,13 @@ func unionEachEdge(s1, s2 *state, visit func(b byte, id1, id2 stateID)) {
 
 func (q *merger) getKey(id1, id2 stateID) [2]stateID {
 	const trivialFinalID = -2
-	if id1.valid() && q.m1.ss[id1].trivialFinal() {
+	if id1.valid() && q.m1.states[id1].trivialFinal() {
 		id1 = trivialFinalID
 		if id2 == invalidID {
 			id2 = trivialFinalID
 		}
 	}
-	if id2.valid() && q.m2.ss[id2].trivialFinal() {
+	if id2.valid() && q.m2.states[id2].trivialFinal() {
 		id2 = trivialFinalID
 		if id1 == invalidID {
 			id1 = trivialFinalID
@@ -97,7 +97,7 @@ func (q *merger) getKey(id1, id2 stateID) [2]stateID {
 	return [2]stateID{id1, id2}
 }
 func (s *state) trivialFinal() bool {
-	return s.label == defaultFinal && len(s.tt) == 0
+	return s.label == defaultFinal && len(s.table) == 0
 }
 
 func (q *merger) getID(id1, id2 stateID) stateID {
@@ -105,9 +105,9 @@ func (q *merger) getID(id1, id2 stateID) stateID {
 	if id, ok := q.idm[key]; ok {
 		return id
 	}
-	id := stateID(len(q.m.ss))
+	id := stateID(len(q.m.states))
 	q.idm[key] = id
-	q.m.ss = append(q.m.ss, state{})
+	q.m.states = append(q.m.states, state{})
 	q.put(id, id1, id2)
 	return id
 }

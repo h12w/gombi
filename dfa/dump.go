@@ -22,7 +22,7 @@ func (s *state) dump(ss []state, sid int) string {
 			w.WriteString(strconv.Itoa(int(s.label)))
 		}
 	}
-	for _, trans := range s.tt {
+	for _, trans := range s.table {
 		w.WriteByte('\n')
 		w.WriteString("\t")
 		w.WriteString(trans.dump())
@@ -55,8 +55,8 @@ func quote(b byte) string {
 func (m *machine) dump() string {
 	var w bytes.Buffer
 	w.WriteByte('\n')
-	for i := range m.ss {
-		w.WriteString(m.ss[i].dump(m.ss, i))
+	for i := range m.states {
+		w.WriteString(m.states[i].dump(m.states, i))
 	}
 	return w.String()
 }
@@ -91,9 +91,9 @@ func (m *machine) writeDotFormat(writer io.Writer) error {
 	w.WriteString("\tENTRY;\n")
 	w.WriteString("\tnode [shape=circle, height=0.2];\n")
 	w.WriteString("\tENTRY -> 0 [label=\"(input)\"];\n")
-	if len(m.ss) > 0 {
-		for i := range m.ss {
-			s := &m.ss[i]
+	if len(m.states) > 0 {
+		for i := range m.states {
+			s := &m.states[i]
 			s.writeDotFormat(&w, i)
 		}
 	}
@@ -108,15 +108,15 @@ func (s *state) writeDotFormat(w io.Writer, sid int) {
 		fmt.Fprint(w, "\tnode [style=\"solid\"];\n")
 	}
 	m := make(map[stateID]bool)
-	for _, trans := range s.tt {
+	for _, trans := range s.table {
 		if !m[trans.next] {
-			fmt.Fprintf(w, "\t%d -> %d [label=\"[%s]\"];\n", sid, trans.next, s.tt.description(trans.next))
+			fmt.Fprintf(w, "\t%d -> %d [label=\"[%s]\"];\n", sid, trans.next, s.table.description(trans.next))
 			m[trans.next] = true
 		}
 	}
 }
-func (tt transTable) description(sid stateID) (l string) {
-	for _, trans := range tt {
+func (table transTable) description(sid stateID) (l string) {
+	for _, trans := range table {
 		if trans.next == sid {
 			l += trans.rangeString()
 		}
