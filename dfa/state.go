@@ -1,23 +1,5 @@
 package dfa
 
-type finalLabel int
-
-const (
-	notFinal     finalLabel = 0
-	defaultFinal finalLabel = 1
-)
-
-type stateID int
-
-const (
-	invalidID      stateID = -1
-	trivialFinalID stateID = -2
-)
-
-func (id stateID) valid() bool {
-	return id >= 0
-}
-
 type state struct {
 	table transTable
 	label finalLabel
@@ -46,7 +28,7 @@ func finalState() state {
 }
 
 func (s *state) final() bool {
-	return s.label > notFinal
+	return s.label.final()
 }
 
 func (s *state) connect(o *state) {

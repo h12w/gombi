@@ -52,7 +52,7 @@ func quote(b byte) string {
 	return fmt.Sprintf(`\\x%X`, b)
 }
 
-func (m *machine) dump() string {
+func (m *Machine) dump() string {
 	var w bytes.Buffer
 	w.WriteByte('\n')
 	for i := range m.states {
@@ -61,7 +61,7 @@ func (m *machine) dump() string {
 	return w.String()
 }
 
-func (m *machine) saveSvg(file string) error {
+func (m *Machine) saveSvg(file string) error {
 	dotCmd := exec.Command("dot", "-Tsvg", "-o", file)
 	w, err := dotCmd.StdinPipe()
 	if err != nil {
@@ -80,7 +80,7 @@ func (m *machine) saveSvg(file string) error {
 	return m.writeDotFormat(w)
 }
 
-func (m *machine) writeDotFormat(writer io.Writer) error {
+func (m *Machine) writeDotFormat(writer io.Writer) error {
 	var w bytes.Buffer
 	w.WriteString("digraph g {\n")
 	w.WriteString("\trankdir=LR;\n")

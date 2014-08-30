@@ -42,7 +42,7 @@ func TestDotFormat(t *testing.T) {
 	`))
 }
 
-func (m *machine) dotFormat() string {
+func (m *Machine) dotFormat() string {
 	var w bytes.Buffer
 	w.WriteByte('\n')
 	m.writeDotFormat(&w)

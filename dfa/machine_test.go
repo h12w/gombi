@@ -1,27 +1,29 @@
 package dfa
 
-/*
-func Test(t *testing.T) {
+import (
+	"testing"
+
+	"github.com/hailiang/gspec"
+)
+
+func TestMatch(t *testing.T) {
+	expect := gspec.Expect(t.FailNow)
 	m := threeToken()
-	ss := m.ss
-	s := &m.ss[0]
-	i := 0
-	input := []byte("0x12A")
-	for i < len(input) {
-		s = &m.ss[s.next(input[i])]
-		if s == nil {
-			fmt.Println("illegal")
-			break
-		}
-		i++
-	}
-	switch s {
-	case &ss[2]:
-		fmt.Println("digit")
-	case &ss[5]:
-		fmt.Println("ident")
-	case &ss[4]:
-		fmt.Println("hex")
+	input := []byte("0x12A 123 abc")
+	p := 0
+	for _, testcase := range []struct {
+		token string
+		label int
+	}{
+		{"0x12A", hexLabel},
+		{"123", decimalLabel},
+		{"abc", identLabel},
+	} {
+		size, label, ok := m.Match(input[p:])
+		expect("matched", ok).Equal(true)
+		expect("matched label", label).Equal(testcase.label)
+		expect("token", string(input[p:p+size])).Equal(testcase.token)
+		p += size
+		p += 1
 	}
 }
-*/

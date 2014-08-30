@@ -19,7 +19,7 @@ var (
 func TestExpr(t *testing.T) {
 	expect := gspec.Expect(t.FailNow)
 	for _, testcase := range []struct {
-		m *machine
+		m *Machine
 		s string
 	}{
 		{
@@ -88,13 +88,13 @@ func TestExpr(t *testing.T) {
 				1-9	s2
 				A-Z	s3
 				a-z	s3
-			s1$
+			s1$3
 				0-9	s2
 				X	s4
 				x	s4
-			s2$
+			s2$3
 				0-9	s2
-			s3$
+			s3$4
 				0-9	s3
 				A-Z	s3
 				a-z	s3
@@ -102,7 +102,7 @@ func TestExpr(t *testing.T) {
 				0-9	s5
 				A-F	s5
 				a-f	s5
-			s5$
+			s5$2
 				0-9	s5
 				A-F	s5
 				a-f	s5
@@ -112,14 +112,20 @@ func TestExpr(t *testing.T) {
 	}
 }
 
-func threeToken() *machine {
+const (
+	hexLabel = iota
+	decimalLabel
+	identLabel
+)
+
+func threeToken() *Machine {
 	decimalDigit := b('0', '9')
 	hexDigit := or(b('0', '9'), b('a', 'f'), b('A', 'F'))
 	letter := or(b('a', 'z'), b('A', 'Z'))
 
-	hexLit := con(s(`0`), c(`xX`), oneOrMore(hexDigit))
-	decimalLit := oneOrMore(decimalDigit)
-	ident := con(letter, zeroOrMore(or(letter, decimalDigit)))
+	hexLit := con(s(`0`), c(`xX`), oneOrMore(hexDigit)).As(hexLabel)
+	decimalLit := oneOrMore(decimalDigit).As(decimalLabel)
+	ident := con(letter, zeroOrMore(or(letter, decimalDigit))).As(identLabel)
 
 	return or(hexLit, decimalLit, ident)
 }

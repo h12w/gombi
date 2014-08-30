@@ -1,37 +1,37 @@
 package dfa
 
-func Str(s string) *machine {
+func Str(s string) *Machine {
 	bs := []byte(s)
 	ss := make(states, 0, len(bs)+1)
 	for i, b := range bs {
 		ss = append(ss, stateTo(b, stateID(i+1)))
 	}
 	ss = append(ss, finalState())
-	return &machine{ss}
+	return &Machine{ss}
 }
 
-func Between(s, e byte) *machine {
-	return &machine{states{
+func Between(s, e byte) *Machine {
+	return &Machine{states{
 		stateBetween(s, e, 1),
 		finalState(),
 	}}
 }
 
 // TODO: unicode
-func Char(s string) *machine {
+func Char(s string) *Machine {
 	a := newTransArray()
 	for i := range s {
 		a.set(s[i], 1)
 	}
-	return &machine{states{
+	return &Machine{states{
 		a.toState(),
 		finalState(),
 	}}
 }
 
-func Con(ms ...*machine) *machine {
+func Con(ms ...*Machine) *Machine {
 	if len(ms) == 0 {
-		panic("zero machines")
+		panic("zero Machines")
 	}
 	m := ms[0]
 	for i := 1; i < len(ms); i++ {
@@ -39,7 +39,7 @@ func Con(ms ...*machine) *machine {
 	}
 	return m
 }
-func con2(m1, m2 *machine) *machine {
+func con2(m1, m2 *Machine) *Machine {
 	m := m1.clone()
 	m2 = m2.clone()
 	m2.shiftID(m.states.count() - 1)
@@ -53,9 +53,9 @@ func con2(m1, m2 *machine) *machine {
 	return m
 }
 
-func Or(ms ...*machine) *machine {
+func Or(ms ...*Machine) *Machine {
 	if len(ms) == 0 {
-		panic("zero machines")
+		panic("zero Machines")
 	}
 	m := ms[0]
 	for i := 1; i < len(ms); i++ {
@@ -63,11 +63,11 @@ func Or(ms ...*machine) *machine {
 	}
 	return m
 }
-func or2(m1, m2 *machine) *machine {
+func or2(m1, m2 *Machine) *Machine {
 	return newMerger(m1, m2).merge()
 }
 
-func ZeroOrMore(m *machine) *machine {
+func ZeroOrMore(m *Machine) *Machine {
 	m = OneOrMore(m)
 	if len(m.states) == 2 {
 		m.states = m.states[1:]
@@ -77,7 +77,7 @@ func ZeroOrMore(m *machine) *machine {
 	return m
 }
 
-func OneOrMore(m *machine) *machine {
+func OneOrMore(m *Machine) *Machine {
 	m = m.clone()
 	m.eachFinal(func(f *state) {
 		f.connect(m.startState())

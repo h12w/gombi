@@ -3,23 +3,23 @@ package dfa
 import "container/list"
 
 type merger struct {
-	m1, m2, m *machine
+	m1, m2, m *Machine
 	l         *list.List
 	idm       map[[2]stateID]stateID
 }
 
-func newMerger(m1, m2 *machine) *merger {
+func newMerger(m1, m2 *Machine) *merger {
 	m := &merger{
 		m1:  m1,
 		m2:  m2,
-		m:   &machine{},
+		m:   &Machine{},
 		l:   list.New(),
 		idm: make(map[[2]stateID]stateID)}
 	m.getID(0, 0)
 	return m
 }
 
-func (q *merger) merge() *machine {
+func (q *merger) merge() *Machine {
 	for q.l.Len() > 0 {
 		id, id1, id2 := q.get()
 		q.m.states[id] = q.mergeState(q.m1.state(id1), q.m2.state(id2))
