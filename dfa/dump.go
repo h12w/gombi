@@ -18,8 +18,8 @@ func (s *state) dump(ss []state, sid int) string {
 	w.WriteString(strconv.Itoa(sid))
 	if s.final() {
 		w.WriteByte('$')
-		if s.finalLabel > defaultFinal {
-			w.WriteString(strconv.Itoa(s.finalLabel))
+		if s.label > defaultFinal {
+			w.WriteString(strconv.Itoa(int(s.label)))
 		}
 	}
 	for _, trans := range s.tt {
@@ -35,7 +35,7 @@ func (t *trans) dump() string {
 	var w bytes.Buffer
 	w.WriteString(t.rangeString())
 	w.WriteString("\ts")
-	w.WriteString(strconv.Itoa(t.next))
+	w.WriteString(strconv.Itoa(int(t.next)))
 	return w.String()
 }
 func (t *trans) rangeString() string {
@@ -107,16 +107,15 @@ func (s *state) writeDotFormat(w io.Writer, sid int) {
 		fmt.Fprintf(w, "\t%d [style=\"filled\"];\n", sid)
 		fmt.Fprint(w, "\tnode [style=\"solid\"];\n")
 	}
-	m := make(map[int]bool)
+	m := make(map[stateID]bool)
 	for _, trans := range s.tt {
 		if !m[trans.next] {
-			fmt.Fprintf(w, "\t%d -> %d [label=\"[%s]\"];\n", sid, trans.next, s.tt.label(trans.next))
+			fmt.Fprintf(w, "\t%d -> %d [label=\"[%s]\"];\n", sid, trans.next, s.tt.description(trans.next))
 			m[trans.next] = true
 		}
 	}
 }
-
-func (tt transTable) label(sid int) (l string) {
+func (tt transTable) description(sid stateID) (l string) {
 	for _, trans := range tt {
 		if trans.next == sid {
 			l += trans.rangeString()

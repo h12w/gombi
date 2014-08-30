@@ -5,7 +5,7 @@ import "container/list"
 type merger struct {
 	m1, m2, m *machine
 	l         *list.List
-	idm       map[[2]int]int
+	idm       map[[2]stateID]stateID
 }
 
 func newMerger(m1, m2 *machine) *merger {
@@ -14,7 +14,7 @@ func newMerger(m1, m2 *machine) *merger {
 		m2:  m2,
 		m:   &machine{},
 		l:   list.New(),
-		idm: make(map[[2]int]int)}
+		idm: make(map[[2]stateID]stateID)}
 	m.getID(0, 0)
 	return m
 }
@@ -29,38 +29,38 @@ func (q *merger) merge() *machine {
 
 func (q *merger) mergeState(s1, s2 *state) state {
 	a := newTransArray()
-	unionEachEdge(s1, s2, func(b byte, id1, id2 int) {
+	unionEachEdge(s1, s2, func(b byte, id1, id2 stateID) {
 		a[b] = q.getID(id1, id2)
 	})
-	return state{a.toTransTable(), unionFinalID(s1, s2)}
+	return state{a.toTransTable(), unionFinalLabel(s1, s2)}
 }
-func unionFinalID(s1, s2 *state) int {
+func unionFinalLabel(s1, s2 *state) finalLabel {
 	if s1 == nil {
-		return s2.finalLabel
+		return s2.label
 	}
 	if s2 == nil {
-		return s1.finalLabel
+		return s1.label
 	}
-	f1, f2 := s1.finalLabel, s2.finalLabel
+	f1, f2 := s1.label, s2.label
 	if f1 > defaultFinal && f2 > defaultFinal && f1 != f2 {
-		panic("confilict finalLabel")
+		panic("confilict label")
 	}
-	return iMax(f1, f2)
+	return finalMax(f1, f2)
 }
 
-func unionEachEdge(s1, s2 *state, visit func(b byte, id1, id2 int)) {
+func unionEachEdge(s1, s2 *state, visit func(b byte, id1, id2 stateID)) {
 	it1, it2 := s1.iter(), s2.iter()
 	b1, next1 := it1()
 	b2, next2 := it2()
 	for {
 		b := b1
 		id1, id2 := next1, next2
-		if id1 == -1 && id2 == -1 {
+		if id1 == invalidID && id2 == invalidID {
 			break
-		} else if id1 == -1 {
+		} else if id1 == invalidID {
 			b = b2
 			b2, next2 = it2()
-		} else if id2 == -1 {
+		} else if id2 == invalidID {
 			b = b1
 			b1, next1 = it1()
 		} else {
@@ -68,11 +68,11 @@ func unionEachEdge(s1, s2 *state, visit func(b byte, id1, id2 int)) {
 				b1, next1 = it1()
 				b2, next2 = it2()
 			} else if b1 < b2 {
-				id2 = -1
+				id2 = invalidID
 				b1, next1 = it1()
 			} else {
 				b = b2
-				id1 = -1
+				id1 = invalidID
 				b2, next2 = it2()
 			}
 		}
@@ -80,45 +80,48 @@ func unionEachEdge(s1, s2 *state, visit func(b byte, id1, id2 int)) {
 	}
 }
 
-func (q *merger) getKey(id1, id2 int) [2]int {
+func (q *merger) getKey(id1, id2 stateID) [2]stateID {
 	const trivialFinalID = -2
-	if id1 >= 0 && q.m1.ss[id1].trivialFinal() {
+	if id1.valid() && q.m1.ss[id1].trivialFinal() {
 		id1 = trivialFinalID
-		if id2 == -1 {
+		if id2 == invalidID {
 			id2 = trivialFinalID
 		}
 	}
-	if id2 >= 0 && q.m2.ss[id2].trivialFinal() {
+	if id2.valid() && q.m2.ss[id2].trivialFinal() {
 		id2 = trivialFinalID
-		if id1 == -1 {
+		if id1 == invalidID {
 			id1 = trivialFinalID
 		}
 	}
-	return [2]int{id1, id2}
+	return [2]stateID{id1, id2}
+}
+func (s *state) trivialFinal() bool {
+	return s.label == defaultFinal && len(s.tt) == 0
 }
 
-func (q *merger) getID(id1, id2 int) int {
+func (q *merger) getID(id1, id2 stateID) stateID {
 	key := q.getKey(id1, id2)
 	if id, ok := q.idm[key]; ok {
 		return id
 	}
-	id := len(q.m.ss)
+	id := stateID(len(q.m.ss))
 	q.idm[key] = id
 	q.m.ss = append(q.m.ss, state{})
 	q.put(id, id1, id2)
 	return id
 }
 
-func (q *merger) put(id, id1, id2 int) {
-	q.l.PushFront([3]int{id, id1, id2})
+func (q *merger) put(id, id1, id2 stateID) {
+	q.l.PushFront([3]stateID{id, id1, id2})
 }
 
-func (q *merger) get() (id int, id1 int, id2 int) {
-	v := q.l.Remove(q.l.Back()).([3]int)
+func (q *merger) get() (id, id1, id2 stateID) {
+	v := q.l.Remove(q.l.Back()).([3]stateID)
 	return v[0], v[1], v[2]
 }
 
-func iMax(a, b int) int {
+func finalMax(a, b finalLabel) finalLabel {
 	if a > b {
 		return a
 	}

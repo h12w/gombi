@@ -4,26 +4,28 @@ func Str(s string) *machine {
 	bs := []byte(s)
 	ss := make([]state, len(bs)+1)
 	for i := range bs {
-		ss[i].set(bs[i], i+1)
+		ss[i].set(bs[i], stateID(i+1))
 	}
-	ss[len(ss)-1].finalLabel = defaultFinal
+	ss[len(ss)-1].label = defaultFinal
 	return &machine{ss}
 }
 
 func Between(s, e byte) *machine {
 	ss := make([]state, 2)
 	ss[0].setBetween(s, e, 1)
-	ss[1].finalLabel = defaultFinal
+	ss[1].label = defaultFinal
 	return &machine{ss}
 }
 
 // TODO: unicode
 func Char(s string) *machine {
-	ss := make([]state, 2)
+	a := newTransArray()
 	for i := range s {
-		ss[0].set(s[i], 1)
+		a.set(s[i], 1)
 	}
-	ss[1].finalLabel = defaultFinal
+	ss := make([]state, 2)
+	ss[0].tt = a.toTransTable()
+	ss[1].label = defaultFinal
 	return &machine{ss}
 }
 
@@ -42,11 +44,9 @@ func con2(m1, m2 *machine) *machine {
 	m2 = m2.clone().shiftID(m.stateCount() - 1)
 	m.each(func(s *state) {
 		if s.final() {
-			m2.ss[0].each(func(t *trans) {
-				s.setBetween(t.s, t.e, t.next)
-			})
+			s.connect(&m2.ss[0])
 			if !m2.ss[0].final() {
-				s.finalLabel = notFinal
+				s.label = notFinal
 			}
 		}
 	})
@@ -75,7 +75,7 @@ func ZeroOrMore(m *machine) *machine {
 		m.ss = m.ss[1:]
 		m.shiftID(-1)
 	}
-	m.ss[0].finalLabel = defaultFinal
+	m.ss[0].label = defaultFinal
 	return m
 }
 
@@ -83,9 +83,7 @@ func OneOrMore(m *machine) *machine {
 	m = m.clone()
 	m.each(func(s *state) {
 		if s.final() {
-			m.ss[0].each(func(t *trans) {
-				s.setBetween(t.s, t.e, t.next)
-			})
+			s.connect(&m.ss[0])
 		}
 	})
 	return m

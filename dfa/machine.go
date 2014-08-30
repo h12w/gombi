@@ -21,13 +21,13 @@ func (m *machine) each(visit func(*state)) {
 func (m *machine) shiftID(offset int) *machine {
 	m.each(func(s *state) {
 		s.each(func(t *trans) {
-			t.next += offset
+			t.next += stateID(offset)
 		})
 	})
 	return m
 }
 
-func (m *machine) state(id int) *state {
+func (m *machine) state(id stateID) *state {
 	if id == -1 {
 		return nil
 	}

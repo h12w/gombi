@@ -1,71 +1,67 @@
 package dfa
 
-// final labels
+type finalLabel int
+
 const (
-	notFinal     = 0
-	defaultFinal = 1
+	notFinal     finalLabel = 0
+	defaultFinal finalLabel = 1
 )
 
+type stateID int
+
+const (
+	invalidID      stateID = -1
+	trivialFinalID stateID = -2
+)
+
+func (id stateID) valid() bool {
+	return id >= 0
+}
+
 type state struct {
-	tt         transTable
-	finalLabel int
+	tt    transTable
+	label finalLabel
 }
 type transTable []trans
 type trans struct {
 	s, e byte
-	next int
+	next stateID
 }
-type transArray [256]int
-
-func newTransArray() (a transArray) {
-	for i := range a {
-		a[i] = -1
-	}
-	return
-}
+type transArray []stateID
 
 func (s *state) final() bool {
-	return s.finalLabel > notFinal
+	return s.label > notFinal
 }
 
-func (s *state) trivialFinal() bool {
-	return s.finalLabel == defaultFinal && len(s.tt) == 0
+func (s *state) set(b byte, next stateID) {
+	s.tt = s.tt.toTransArray().set(b, next).toTransTable()
 }
 
-func (s *state) clone() state {
-	return state{s.tt.clone(), s.finalLabel}
+func (s *state) setBetween(from, to byte, next stateID) {
+	s.tt = s.tt.toTransArray().setBetween(from, to, next).toTransTable()
 }
 
-func (s *state) set(b byte, next int) {
-	if a := s.tt.toTransArray(); a[b] == -1 {
-		a[b] = next
-		s.tt = a.toTransTable()
-		return
-	}
-	panic("trans already set")
-}
-
-func (s *state) setBetween(from, to byte, next int) {
+func (s *state) connect(o *state) {
 	a := s.tt.toTransArray()
-	for b := from; b <= to; b++ {
-		if a[b] == -1 {
-			a[b] = next
-		} else {
-			panic("trans already set")
-		}
-	}
+	o.each(func(t *trans) {
+		a.setBetween(t.s, t.e, t.next)
+	})
 	s.tt = a.toTransTable()
 }
 
-func (s *state) iter() func() (byte, int) {
+func (s *state) clone() state {
+	return state{s.tt.clone(), s.label}
+}
+
+func (s *state) iter() func() (byte, stateID) {
 	if s == nil || len(s.tt) == 0 {
-		return func() (byte, int) {
-			return 0, -1
+		return func() (byte, stateID) {
+			return 0, invalidID
 		}
 	}
 	i := 0
 	b := s.tt[i].s
-	return func() (byte, int) {
+	return func() (byte, stateID) {
 		defer func() {
 			if i < len(s.tt) {
 				if b == s.tt[i].e {
@@ -81,7 +77,7 @@ func (s *state) iter() func() (byte, int) {
 		if i < len(s.tt) {
 			return b, s.tt[i].next
 		}
-		return 0, -1
+		return 0, invalidID
 	}
 }
 
@@ -89,16 +85,16 @@ func (s *state) each(visit func(*trans)) {
 	s.tt.each(visit)
 }
 
-func (s *state) next(b byte) (sid int) {
+func (s *state) next(b byte) (sid stateID) {
 	for i := range s.tt {
 		if s.tt[i].s <= b && b <= s.tt[i].e {
 			return s.tt[i].next
 		}
 	}
-	return -1
+	return invalidID
 }
 
-func (s *state) binaryNext(b byte) (sid int) {
+func (s *state) binaryNext(b byte) (sid stateID) {
 	min, max := 0, len(s.tt)-1
 	for min <= max {
 		mid := (min + max) / 2
@@ -110,7 +106,7 @@ func (s *state) binaryNext(b byte) (sid int) {
 			min = mid + 1
 		}
 	}
-	return -1
+	return invalidID
 }
 
 func (tt *transTable) each(visit func(*trans)) {
@@ -133,10 +129,44 @@ func (tt *transTable) toTransArray() transArray {
 	return a
 }
 
+func (t *trans) each(visit func(byte)) {
+	b := t.s
+	for {
+		visit(b)
+		if b == t.e {
+			break
+		}
+		b++
+	}
+}
+
+func newTransArray() transArray {
+	a := make(transArray, 256)
+	for i := range a {
+		a[i] = invalidID
+	}
+	return a
+}
+
+func (a transArray) set(b byte, next stateID) transArray {
+	if a[b] == invalidID {
+		a[b] = next
+		return a
+	}
+	panic("trans already set")
+}
+
+func (a transArray) setBetween(from, to byte, next stateID) transArray {
+	for b := from; b <= to; b++ {
+		a.set(b, next)
+	}
+	return a
+}
+
 func (ts transArray) toTransTable() (tt transTable) {
 	i := 0
 	for ; i < len(ts); i++ {
-		if ts[i] != -1 {
+		if ts[i] != invalidID {
 			break
 		}
 	}
@@ -146,7 +176,7 @@ func (ts transArray) toTransTable() (tt transTable) {
 	tt = append(tt, trans{byte(i), byte(i), ts[i]})
 	i++
 	for ; i < len(ts); i++ {
-		if ts[i] != -1 {
+		if ts[i] != invalidID {
 			b := byte(i)
 			last := tt[len(tt)-1]
 			if b == last.e+1 && ts[i] == last.next {
@@ -157,15 +187,4 @@ func (ts transArray) toTransTable() (tt transTable) {
 		}
 	}
 	return
-}
-
-func (t *trans) each(visit func(byte)) {
-	b := t.s
-	for {
-		visit(b)
-		if b == t.e {
-			break
-		}
-		b++
-	}
 }
