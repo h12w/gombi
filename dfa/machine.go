@@ -20,27 +20,32 @@ func (m *Machine) As(label int) *Machine {
 	return m
 }
 
+// Match greedily matches the DFA against src.
 func (m *Machine) Match(src []byte) (size, label int, matched bool) {
 	var (
-		s   *state
-		sid = stateID(0)
-		p   = 0
+		s, matchedState *state
+		sid             = 0
+		pos, matchedPos int
 	)
-	for sid.valid() {
+	for sid >= 0 {
 		s = &m.states[sid]
-		if p < len(src) {
-			sid = s.next(src[p])
-			if sid.valid() {
-				p++
+		if s.final() {
+			matchedState = s
+			matchedPos = pos
+		}
+		if pos < len(src) {
+			sid = s.next(src[pos])
+			if sid >= 0 {
+				pos++
 			}
 		} else {
 			break
 		}
 	}
-	if s.final() {
-		return p, s.label.toExternal(), true
+	if matchedState != nil {
+		return matchedPos, matchedState.label.toExternal(), true
 	}
-	return p, -1, false
+	return 0, -1, false
 }
 
 func (ss states) each(visit func(*state)) {
@@ -69,7 +74,7 @@ func (ss states) clone() states {
 	return ss
 }
 
-func (ss states) state(id stateID) *state {
+func (ss states) state(id int) *state {
 	if id == -1 {
 		return nil
 	}
@@ -79,7 +84,7 @@ func (ss states) state(id stateID) *state {
 func (ss states) shiftID(offset int) {
 	ss.each(func(s *state) {
 		s.each(func(t *trans) {
-			t.next += stateID(offset)
+			t.next += offset
 		})
 	})
 }

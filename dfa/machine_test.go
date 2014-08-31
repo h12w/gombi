@@ -8,22 +8,20 @@ import (
 
 func TestMatch(t *testing.T) {
 	expect := gspec.Expect(t.FailNow)
-	m := threeToken()
-	input := []byte("0x12A 123 abc")
-	p := 0
 	for _, testcase := range []struct {
+		m     *Machine
+		input string
 		token string
 		label int
 	}{
-		{"0x12A", hexLabel},
-		{"123", decimalLabel},
-		{"abc", identLabel},
+		{threeToken(), "0x12A ", "0x12A", hexLabel},
+		{threeToken(), "123 ", "123", decimalLabel},
+		{threeToken(), "abc", "abc", identLabel},
+		{oneOrMore(s("ab")).As(1), "aba", "ab", 1},
 	} {
-		size, label, ok := m.Match(input[p:])
+		size, label, ok := testcase.m.Match([]byte(testcase.input))
 		expect("matched", ok).Equal(true)
 		expect("matched label", label).Equal(testcase.label)
-		expect("token", string(input[p:p+size])).Equal(testcase.token)
-		p += size
-		p += 1
+		expect("token", string(testcase.input[:size])).Equal(testcase.token)
 	}
 }

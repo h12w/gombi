@@ -5,7 +5,7 @@ import "container/list"
 type merger struct {
 	m1, m2, m *Machine
 	l         *list.List
-	idm       map[[2]stateID]stateID
+	idm       map[[2]int]int
 }
 
 func newMerger(m1, m2 *Machine) *merger {
@@ -14,12 +14,17 @@ func newMerger(m1, m2 *Machine) *merger {
 		m2:  m2,
 		m:   &Machine{},
 		l:   list.New(),
-		idm: make(map[[2]stateID]stateID)}
-	m.getID(0, 0)
+		idm: make(map[[2]int]int)}
 	return m
 }
 
 func (q *merger) merge() *Machine {
+	if q.m1 == nil {
+		return q.m2
+	} else if q.m2 == nil {
+		return q.m1
+	}
+	q.getID(0, 0)
 	for q.l.Len() > 0 {
 		id, id1, id2 := q.get()
 		q.m.states[id] = q.mergeState(q.m1.state(id1), q.m2.state(id2))
@@ -29,7 +34,7 @@ func (q *merger) merge() *Machine {
 
 func (q *merger) mergeState(s1, s2 *state) state {
 	a := newTransArray()
-	unionEachEdge(s1, s2, func(b byte, id1, id2 stateID) {
+	unionEachEdge(s1, s2, func(b byte, id1, id2 int) {
 		a[b] = q.getID(id1, id2)
 	})
 	return state{a.toTransTable(), unionFinalLabel(s1, s2)}
@@ -48,7 +53,7 @@ func unionFinalLabel(s1, s2 *state) finalLabel {
 	return finalMax(f1, f2)
 }
 
-func unionEachEdge(s1, s2 *state, visit func(b byte, id1, id2 stateID)) {
+func unionEachEdge(s1, s2 *state, visit func(b byte, id1, id2 int)) {
 	it1, it2 := s1.iter(), s2.iter()
 	b1, next1 := it1()
 	b2, next2 := it2()
@@ -80,44 +85,44 @@ func unionEachEdge(s1, s2 *state, visit func(b byte, id1, id2 stateID)) {
 	}
 }
 
-func (q *merger) getKey(id1, id2 stateID) [2]stateID {
+func (q *merger) getKey(id1, id2 int) [2]int {
 	const trivialFinalID = -2
-	if id1.valid() && q.m1.states[id1].trivialFinal() {
+	if id1 >= 0 && q.m1.states[id1].trivialFinal() {
 		id1 = trivialFinalID
 		if id2 == invalidID {
 			id2 = trivialFinalID
 		}
 	}
-	if id2.valid() && q.m2.states[id2].trivialFinal() {
+	if id2 >= 0 && q.m2.states[id2].trivialFinal() {
 		id2 = trivialFinalID
 		if id1 == invalidID {
 			id1 = trivialFinalID
 		}
 	}
-	return [2]stateID{id1, id2}
+	return [2]int{id1, id2}
 }
 func (s *state) trivialFinal() bool {
 	return s.label == defaultFinal && len(s.table) == 0
 }
 
-func (q *merger) getID(id1, id2 stateID) stateID {
+func (q *merger) getID(id1, id2 int) int {
 	key := q.getKey(id1, id2)
 	if id, ok := q.idm[key]; ok {
 		return id
 	}
-	id := stateID(len(q.m.states))
+	id := len(q.m.states)
 	q.idm[key] = id
 	q.m.states = append(q.m.states, state{})
 	q.put(id, id1, id2)
 	return id
 }
 
-func (q *merger) put(id, id1, id2 stateID) {
-	q.l.PushFront([3]stateID{id, id1, id2})
+func (q *merger) put(id, id1, id2 int) {
+	q.l.PushFront([3]int{id, id1, id2})
 }
 
-func (q *merger) get() (id, id1, id2 stateID) {
-	v := q.l.Remove(q.l.Back()).([3]stateID)
+func (q *merger) get() (id, id1, id2 int) {
+	v := q.l.Remove(q.l.Back()).([3]int)
 	return v[0], v[1], v[2]
 }
 

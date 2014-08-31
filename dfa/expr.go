@@ -4,7 +4,7 @@ func Str(s string) *Machine {
 	bs := []byte(s)
 	ss := make(states, 0, len(bs)+1)
 	for i, b := range bs {
-		ss = append(ss, stateTo(b, stateID(i+1)))
+		ss = append(ss, stateTo(b, i+1))
 	}
 	ss = append(ss, finalState())
 	return &Machine{ss}

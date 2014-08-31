@@ -1,5 +1,10 @@
 package dfa
 
+const (
+	invalidID      = -1
+	trivialFinalID = -2
+)
+
 type finalLabel int
 
 const (
@@ -25,15 +30,4 @@ func (l finalLabel) toExternal() int {
 		return int(l - labeledFinalStart)
 	}
 	panic("machine is not labeled")
-}
-
-type stateID int
-
-const (
-	invalidID      stateID = -1
-	trivialFinalID stateID = -2
-)
-
-func (id stateID) valid() bool {
-	return id >= 0
 }

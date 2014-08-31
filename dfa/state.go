@@ -7,17 +7,17 @@ type state struct {
 type transTable []trans
 type trans struct {
 	s, e byte
-	next stateID
+	next int
 }
-type transArray [256]stateID
+type transArray [256]int
 
-func stateBetween(from, to byte, next stateID) state {
+func stateBetween(from, to byte, next int) state {
 	a := newTransArray()
 	a.setBetween(from, to, next)
 	return state{table: a.toTransTable()}
 }
 
-func stateTo(b byte, next stateID) state {
+func stateTo(b byte, next int) state {
 	a := newTransArray()
 	a.set(b, next)
 	return state{table: a.toTransTable()}
@@ -43,15 +43,15 @@ func (s *state) clone() state {
 	return state{s.table.clone(), s.label}
 }
 
-func (s *state) iter() func() (byte, stateID) {
+func (s *state) iter() func() (byte, int) {
 	if s == nil || len(s.table) == 0 {
-		return func() (byte, stateID) {
+		return func() (byte, int) {
 			return 0, invalidID
 		}
 	}
 	i := 0
 	b := s.table[i].s
-	return func() (byte, stateID) {
+	return func() (byte, int) {
 		defer func() {
 			if i < len(s.table) {
 				if b == s.table[i].e {
@@ -75,7 +75,7 @@ func (s *state) each(visit func(*trans)) {
 	s.table.each(visit)
 }
 
-func (s *state) next(b byte) (sid stateID) {
+func (s *state) next(b byte) (sid int) {
 	for i := range s.table {
 		if s.table[i].s <= b && b <= s.table[i].e {
 			return s.table[i].next
@@ -84,7 +84,7 @@ func (s *state) next(b byte) (sid stateID) {
 	return invalidID
 }
 
-func (s *state) binaryNext(b byte) (sid stateID) {
+func (s *state) binaryNext(b byte) (sid int) {
 	min, max := 0, len(s.table)-1
 	for min <= max {
 		mid := (min + max) / 2
@@ -126,7 +126,7 @@ func newTransArray() (a transArray) {
 	return a
 }
 
-func (a *transArray) set(b byte, next stateID) *transArray {
+func (a *transArray) set(b byte, next int) *transArray {
 	if a[b] == invalidID {
 		a[b] = next
 		return a
@@ -134,7 +134,7 @@ func (a *transArray) set(b byte, next stateID) *transArray {
 	panic("trans already set")
 }
 
-func (a *transArray) setBetween(from, to byte, next stateID) *transArray {
+func (a *transArray) setBetween(from, to byte, next int) *transArray {
 	for b := from; b <= to; b++ {
 		a.set(b, next)
 	}

@@ -10,7 +10,7 @@ import (
 	"unicode/utf8"
 )
 
-var FontName = "Source Code Pro"
+var FontName = "Ubuntu Mono"
 
 func (s *state) dump(ss []state, sid int) string {
 	var w bytes.Buffer
@@ -35,7 +35,7 @@ func (t *trans) dump() string {
 	var w bytes.Buffer
 	w.WriteString(t.rangeString())
 	w.WriteString("\ts")
-	w.WriteString(strconv.Itoa(int(t.next)))
+	w.WriteString(strconv.Itoa(t.next))
 	return w.String()
 }
 func (t *trans) rangeString() string {
@@ -45,11 +45,15 @@ func (t *trans) rangeString() string {
 	return quote(t.s) + "-" + quote(t.e)
 }
 func quote(b byte) string {
-	if b < utf8.RuneSelf {
+	if b < utf8.RuneSelf && strconv.IsPrint(rune(b)) {
+		return string(rune(b))
+	}
+	switch b {
+	case '\a', '\b', '\f', '\n', '\r', '\t', '\v':
 		s := strconv.QuoteRune(rune(b))
 		return s[1 : len(s)-1]
 	}
-	return fmt.Sprintf(`\\x%X`, b)
+	return fmt.Sprintf(`\\x%.2x`, b)
 }
 
 func (m *Machine) dump() string {
@@ -84,12 +88,12 @@ func (m *Machine) writeDotFormat(writer io.Writer) error {
 	var w bytes.Buffer
 	w.WriteString("digraph g {\n")
 	w.WriteString("\trankdir=LR;\n")
-	fmt.Fprintf(&w, "\tnode [fontname=\"%s\"];\n", FontName)
-	fmt.Fprintf(&w, "\tedge [fontname=\"%s\"];\n", FontName)
+	fmt.Fprintf(&w, "\tnode [fontname=\"%s\", fontsize=12];\n", FontName)
+	fmt.Fprintf(&w, "\tedge [fontname=\"%s\", fontsize=12];\n", FontName)
 	w.WriteString("\tedge [arrowhead=lnormal];\n")
 	w.WriteString("\tnode [shape=point];\n")
 	w.WriteString("\tENTRY;\n")
-	w.WriteString("\tnode [shape=circle, height=0.2];\n")
+	w.WriteString("\tnode [shape=circle, fixedsize=true, width=\".25\"];\n")
 	w.WriteString("\tENTRY -> 0 [label=\"(input)\"];\n")
 	if len(m.states) > 0 {
 		for i := range m.states {
@@ -107,15 +111,15 @@ func (s *state) writeDotFormat(w io.Writer, sid int) {
 		fmt.Fprintf(w, "\t%d [style=\"filled\"];\n", sid)
 		fmt.Fprint(w, "\tnode [style=\"solid\"];\n")
 	}
-	m := make(map[stateID]bool)
+	m := make(map[int]bool)
 	for _, trans := range s.table {
 		if !m[trans.next] {
-			fmt.Fprintf(w, "\t%d -> %d [label=\"[%s]\"];\n", sid, trans.next, s.table.description(trans.next))
+			fmt.Fprintf(w, "\t%d -> %d [label=\"%s\"];\n", sid, trans.next, s.table.description(trans.next))
 			m[trans.next] = true
 		}
 	}
 }
-func (table transTable) description(sid stateID) (l string) {
+func (table transTable) description(sid int) (l string) {
 	for _, trans := range table {
 		if trans.next == sid {
 			l += trans.rangeString()
