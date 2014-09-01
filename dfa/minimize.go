@@ -15,6 +15,9 @@ func (m *Machine) minimize() *Machine {
 			si, ti := s.iter(), t.iter()
 			sb, sid := si()
 			tb, tid := ti()
+			if sb != tb {
+				panic("assert: each iteration should return the same input byte")
+			}
 			for sid != -1 && tid != -1 {
 				if sb != tb {
 					panic("assert: each iteration should return the same input byte")
@@ -25,31 +28,17 @@ func (m *Machine) minimize() *Machine {
 			}
 		})
 	}
-	min := -1
-	idm := make(map[int]bool)
+	idm := make(map[int]int)
 	diff.eachSame(func(i, j int) {
-		idm[i] = true
-		idm[j] = true
-		if min == -1 || i < min {
-			min = i
-		}
+		idm[j] = i
 	})
-	if min != -1 {
-		delete(idm, min)
-		m.each(func(s *state) {
-			changed := false
-			s.each(func(t *trans) {
-				if idm[t.next] {
-					t.next = min
-					changed = true
-				}
-			})
-			if changed {
-				a := s.table.toTransArray()
-				s.table = a.toTransTable()
+	m.each(func(s *state) {
+		s.each(func(t *trans) {
+			if small, ok := idm[t.next]; ok {
+				t.next = small
 			}
 		})
-	}
+	})
 	return or2(m, m) // or2(m, m) is also a way to remove unreachable nodes
 }
 
@@ -80,7 +69,9 @@ func newDiff(n int) *diff {
 
 func (d *diff) set(i, j int, different bool) {
 	d.hasNewDiff = d.hasNewDiff || different
-	d.a[d.index(i, j)] = different
+	if different {
+		d.a[d.index(i, j)] = different
+	}
 }
 
 func (d *diff) get(i, j int) bool {
@@ -98,7 +89,7 @@ func (d *diff) index(i, j int) int {
 }
 
 func (d *diff) eachSame(visit func(int, int)) {
-	for i := 0; i <= d.n-2; i++ {
+	for i := d.n - 2; i >= 0; i-- { // reverse order so the smaller comes later
 		for j := i + 1; j <= d.n-1; j++ {
 			if !d.get(i, j) {
 				visit(i, j)

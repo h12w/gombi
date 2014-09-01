@@ -10,7 +10,11 @@ func Str(s string) *Machine {
 	return &Machine{ss}
 }
 
-func Between(s, e byte) *Machine {
+func Between(from, to rune) *Machine {
+	return (&u8s{}).between(from, to) //.minimize()
+}
+
+func BetweenByte(s, e byte) *Machine {
 	return &Machine{states{
 		stateBetween(s, e, 1),
 		finalState(),

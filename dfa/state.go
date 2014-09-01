@@ -135,8 +135,14 @@ func (a *transArray) set(b byte, next int) *transArray {
 }
 
 func (a *transArray) setBetween(from, to byte, next int) *transArray {
-	for b := from; b <= to; b++ {
+	b := from
+	for {
 		a.set(b, next)
+		if b == to {
+			break
+		} else {
+			b++
+		}
 	}
 	return a
 }

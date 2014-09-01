@@ -9,7 +9,7 @@ import (
 var (
 	s          = Str
 	c          = Char
-	b          = Between
+	b          = BetweenByte
 	con        = Con
 	or         = Or
 	zeroOrMore = ZeroOrMore
