@@ -7,10 +7,14 @@ import (
 	"io/ioutil"
 	"os/exec"
 	"strconv"
+	"time"
 	"unicode/utf8"
 )
 
-var FontName = "Ubuntu Mono"
+type GraphOption struct {
+	FontName  string
+	TimeLabel bool
+}
 
 func (s *state) dump(ss []state, sid int) string {
 	var w bytes.Buffer
@@ -33,8 +37,8 @@ func (s *state) dump(ss []state, sid int) string {
 
 func (t *trans) dump() string {
 	var w bytes.Buffer
-	w.WriteString(t.rangeString())
-	w.WriteString("\ts")
+	fmt.Fprintf(&w, "%-7s", t.rangeString())
+	w.WriteString(" s")
 	w.WriteString(strconv.Itoa(t.next))
 	return w.String()
 }
@@ -46,14 +50,9 @@ func (t *trans) rangeString() string {
 }
 func quote(b byte) string {
 	if b < utf8.RuneSelf && strconv.IsPrint(rune(b)) {
-		return string(rune(b))
+		return strconv.QuoteRune(rune(b))
 	}
-	switch b {
-	case '\a', '\b', '\f', '\n', '\r', '\t', '\v':
-		s := strconv.QuoteRune(rune(b))
-		return s[1 : len(s)-1]
-	}
-	return fmt.Sprintf(`\\x%.2x`, b)
+	return fmt.Sprintf(`%.2x`, b)
 }
 
 func (m *Machine) dump() string {
@@ -65,7 +64,7 @@ func (m *Machine) dump() string {
 	return w.String()
 }
 
-func (m *Machine) saveSvg(file string) error {
+func (m *Machine) SaveSVG(file string, opt ...*GraphOption) error {
 	dotCmd := exec.Command("dot", "-Tsvg", "-o", file)
 	w, err := dotCmd.StdinPipe()
 	if err != nil {
@@ -81,19 +80,27 @@ func (m *Machine) saveSvg(file string) error {
 		buf, _ := ioutil.ReadAll(ew)
 		fmt.Println(string(buf))
 	}()
-	return m.writeDotFormat(w)
+	if len(opt) == 0 {
+		opt = []*GraphOption{{}}
+	}
+	return m.writeDotFormat(w, opt[0])
 }
 
-func (m *Machine) writeDotFormat(writer io.Writer) error {
+func (m *Machine) writeDotFormat(writer io.Writer, opt *GraphOption) error {
 	var w bytes.Buffer
 	w.WriteString("digraph g {\n")
+	if opt.TimeLabel {
+		fmt.Fprintf(&w, "graph [label=\"(%s)\", labeljust=right, fontsize=12];", time.Now().Format("2006-01-02 15:04:05"))
+	}
 	w.WriteString("\trankdir=LR;\n")
-	fmt.Fprintf(&w, "\tnode [fontname=\"%s\", fontsize=12];\n", FontName)
-	fmt.Fprintf(&w, "\tedge [fontname=\"%s\", fontsize=12];\n", FontName)
+	if opt.FontName != "" {
+		fmt.Fprintf(&w, "\tnode [fontname=\"%s\"];\n", opt.FontName)
+		fmt.Fprintf(&w, "\tedge [fontname=\"%s\"];\n", opt.FontName)
+	}
+	w.WriteString("\tnode [fontsize=12, shape=circle, fixedsize=true, width=\".25\"];\n")
+	w.WriteString("\tedge [fontsize=12];\n")
 	w.WriteString("\tedge [arrowhead=lnormal];\n")
-	w.WriteString("\tnode [shape=point];\n")
-	w.WriteString("\tENTRY;\n")
-	w.WriteString("\tnode [shape=circle, fixedsize=true, width=\".25\"];\n")
+	w.WriteString("\tENTRY [shape=point, fixedsize=false, width=\".05\"];\n")
 	w.WriteString("\tENTRY -> 0 [label=\"(input)\"];\n")
 	if len(m.states) > 0 {
 		for i := range m.states {
@@ -108,8 +115,7 @@ func (m *Machine) writeDotFormat(writer io.Writer) error {
 }
 func (s *state) writeDotFormat(w io.Writer, sid int) {
 	if s.final() {
-		fmt.Fprintf(w, "\t%d [style=\"filled\"];\n", sid)
-		fmt.Fprint(w, "\tnode [style=\"solid\"];\n")
+		fmt.Fprintf(w, "\t%d [shape=doublecircle, width=\".18\"];\n", sid)
 	}
 	m := make(map[int]bool)
 	for _, trans := range s.table {
@@ -122,6 +128,9 @@ func (s *state) writeDotFormat(w io.Writer, sid int) {
 func (table transTable) description(sid int) (l string) {
 	for _, trans := range table {
 		if trans.next == sid {
+			if l != "" {
+				l += `\n`
+			}
 			l += trans.rangeString()
 		}
 	}

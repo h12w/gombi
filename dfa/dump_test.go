@@ -14,30 +14,26 @@ func TestDotFormat(t *testing.T) {
 	expect(m.dotFormat()).Equal(gspec.Unindent(`
 		digraph g {
 			rankdir=LR;
-			node [fontname="Ubuntu Mono", fontsize=12];
-			edge [fontname="Ubuntu Mono", fontsize=12];
+			node [fontname="Ubuntu Mono"];
+			edge [fontname="Ubuntu Mono"];
+			node [fontsize=12, shape=circle, fixedsize=true, width=".25"];
+			edge [fontsize=12];
 			edge [arrowhead=lnormal];
-			node [shape=point];
-			ENTRY;
-			node [shape=circle, fixedsize=true, width=".25"];
+			ENTRY [shape=point, fixedsize=false, width=".05"];
 			ENTRY -> 0 [label="(input)"];
-			0 -> 1 [label="0"];
-			0 -> 2 [label="1-9"];
-			0 -> 3 [label="A-Za-z"];
-			1 [style="filled"];
-			node [style="solid"];
-			1 -> 2 [label="0-9"];
-			1 -> 4 [label="Xx"];
-			2 [style="filled"];
-			node [style="solid"];
-			2 -> 2 [label="0-9"];
-			3 [style="filled"];
-			node [style="solid"];
-			3 -> 3 [label="0-9A-Za-z"];
-			4 -> 5 [label="0-9A-Fa-f"];
-			5 [style="filled"];
-			node [style="solid"];
-			5 -> 5 [label="0-9A-Fa-f"];
+			0 -> 1 [label="'0'"];
+			0 -> 2 [label="'1'-'9'"];
+			0 -> 3 [label="'A'-'Z'\n'a'-'z'"];
+			1 [shape=doublecircle, width=".18"];
+			1 -> 2 [label="'0'-'9'"];
+			1 -> 4 [label="'X'\n'x'"];
+			2 [shape=doublecircle, width=".18"];
+			2 -> 2 [label="'0'-'9'"];
+			3 [shape=doublecircle, width=".18"];
+			3 -> 3 [label="'0'-'9'\n'A'-'Z'\n'a'-'z'"];
+			4 -> 5 [label="'0'-'9'\n'A'-'F'\n'a'-'f'"];
+			5 [shape=doublecircle, width=".18"];
+			5 -> 5 [label="'0'-'9'\n'A'-'F'\n'a'-'f'"];
 		}
 	`))
 }
@@ -45,7 +41,7 @@ func TestDotFormat(t *testing.T) {
 func (m *Machine) dotFormat() string {
 	var w bytes.Buffer
 	w.WriteByte('\n')
-	m.writeDotFormat(&w)
+	m.writeDotFormat(&w, &GraphOption{"Ubuntu Mono", false})
 	w.WriteByte('\n')
 	return w.String()
 }

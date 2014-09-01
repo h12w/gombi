@@ -11,7 +11,7 @@ func Str(s string) *Machine {
 }
 
 func Between(from, to rune) *Machine {
-	return (&u8s{}).between(from, to) //.minimize()
+	return (&u8s{}).between(from, to).minimize()
 }
 
 func BetweenByte(s, e byte) *Machine {
