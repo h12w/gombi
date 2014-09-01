@@ -13,18 +13,15 @@ func (m *Machine) minimize() *Machine {
 		diff.eachSame(func(i, j int) {
 			s, t := m.states[i], m.states[j]
 			si, ti := s.iter(), t.iter()
-			sb, sid := si()
-			tb, tid := ti()
-			if sb != tb {
-				panic("assert: each iteration should return the same input byte")
-			}
+			_, sid := si()
+			_, tid := ti()
 			for sid != -1 && tid != -1 {
-				if sb != tb {
-					panic("assert: each iteration should return the same input byte")
+				if sid != tid && diff.get(sid, tid) {
+					diff.set(i, j, true)
+					break
 				}
-				diff.set(i, j, sid != tid && diff.get(sid, tid))
-				sb, sid = si()
-				tb, tid = ti()
+				_, sid = si()
+				_, tid = ti()
 			}
 		})
 	}
@@ -68,9 +65,9 @@ func newDiff(n int) *diff {
 }
 
 func (d *diff) set(i, j int, different bool) {
-	d.hasNewDiff = d.hasNewDiff || different
 	if different {
-		d.a[d.index(i, j)] = different
+		d.hasNewDiff = true
+		d.a[d.index(i, j)] = true
 	}
 }
 

@@ -10,8 +10,16 @@ func Str(s string) *Machine {
 	return &Machine{ss}
 }
 
-func Between(from, to rune) *Machine {
-	return (&u8s{}).between(from, to).minimize()
+func Between(lo, hi rune) *Machine {
+	if lo > hi {
+		lo, hi = hi, lo
+	}
+	if lo < 0 || hi > 0x10ffff {
+		panic("invalid range for unicode point")
+	}
+	u := &u8s{}
+	u.between(lo, hi)
+	return u.m().minimize()
 }
 
 func BetweenByte(s, e byte) *Machine {

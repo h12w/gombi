@@ -11,9 +11,9 @@ type trans struct {
 }
 type transArray [256]int
 
-func stateBetween(from, to byte, next int) state {
+func stateBetween(lo, hi byte, next int) state {
 	a := newTransArray()
-	a.setBetween(from, to, next)
+	a.setBetween(lo, hi, next)
 	return state{table: a.toTransTable()}
 }
 
@@ -134,11 +134,11 @@ func (a *transArray) set(b byte, next int) *transArray {
 	panic("trans already set")
 }
 
-func (a *transArray) setBetween(from, to byte, next int) *transArray {
-	b := from
+func (a *transArray) setBetween(lo, hi byte, next int) *transArray {
+	b := lo
 	for {
 		a.set(b, next)
-		if b == to {
+		if b == hi {
 			break
 		} else {
 			b++
