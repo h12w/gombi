@@ -14,9 +14,9 @@ func TestMatch(t *testing.T) {
 		token string
 		label int
 	}{
-		{threeToken(), "0x12A ", "0x12A", hexLabel},
-		{threeToken(), "123 ", "123", decimalLabel},
-		{threeToken(), "abc", "abc", identLabel},
+		{threeToken, "0x12A ", "0x12A", hexLabel},
+		{threeToken, "123 ", "123", decimalLabel},
+		{threeToken, "abc", "abc", identLabel},
 		{oneOrMore(s("ab")).As(1), "aba", "ab", 1},
 	} {
 		size, label, ok := testcase.m.Match([]byte(testcase.input))

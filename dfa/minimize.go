@@ -29,14 +29,17 @@ func (m *Machine) minimize() *Machine {
 	diff.eachSame(func(i, j int) {
 		idm[j] = i
 	})
-	m.each(func(s *state) {
-		s.each(func(t *trans) {
-			if small, ok := idm[t.next]; ok {
-				t.next = small
-			}
+	if len(idm) > 0 {
+		m.each(func(s *state) {
+			s.each(func(t *trans) {
+				if small, ok := idm[t.next]; ok {
+					t.next = small
+				}
+			})
 		})
-	})
-	return or2(m, m) // or2(m, m) is also a way to remove unreachable nodes
+		return or2(m, m) // or2(m, m) is also a way to remove unreachable nodes
+	}
+	return m
 }
 
 type transSet [256]bool

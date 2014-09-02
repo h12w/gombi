@@ -131,7 +131,10 @@ func (a *transArray) set(b byte, next int) *transArray {
 		a[b] = next
 		return a
 	}
-	panic("trans already set")
+	if a[b] != next {
+		panic("a different trans already set")
+	}
+	return a
 }
 
 func (a *transArray) setBetween(lo, hi byte, next int) *transArray {

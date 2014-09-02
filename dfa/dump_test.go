@@ -10,8 +10,7 @@ import (
 
 func TestDotFormat(t *testing.T) {
 	expect := gspec.Expect(t.FailNow)
-	m := threeToken()
-	expect(m.dotFormat()).Equal(gspec.Unindent(`
+	expect(threeToken.dotFormat()).Equal(gspec.Unindent(`
 		digraph g {
 			rankdir=LR;
 			node [fontname="Ubuntu Mono"];

@@ -1,6 +1,7 @@
 package dfa
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/hailiang/gspec"
@@ -12,15 +13,44 @@ var (
 	b          = Between
 	con        = Con
 	or         = Or
+	and        = And
 	zeroOrMore = ZeroOrMore
+	zeroOrOne  = ZeroOrOne
 	oneOrMore  = OneOrMore
+	graphOpt   = &GraphOption{"Ubuntu Mono", true}
 )
 
-var graphOpt = &GraphOption{"Ubuntu Mono", true}
+const (
+	hexLabel = iota
+	decimalLabel
+	identLabel
+)
+
+var threeToken = func() *Machine {
+	decimalDigit := b('0', '9')
+	hexDigit := or(b('0', '9'), b('a', 'f'), b('A', 'F'))
+	letter := or(b('a', 'z'), b('A', 'Z'))
+
+	hexLit := con(s(`0`), c(`xX`), oneOrMore(hexDigit)).As(hexLabel)
+	decimalLit := oneOrMore(decimalDigit).As(decimalLabel)
+	ident := con(letter, zeroOrMore(or(letter, decimalDigit))).As(identLabel)
+
+	return or(hexLit, decimalLit, ident)
+}()
+
+var bsas = func() *Machine {
+	bsa := con(zeroOrMore(s("b")), s("a"))
+	return zeroOrMore(bsa, bsa)
+}()
+
+var asbs = func() *Machine {
+	asb := con(zeroOrMore(s("a")), s("b"))
+	return zeroOrMore(asb, asb)
+}()
 
 func TestExpr(t *testing.T) {
 	expect := gspec.Expect(t.FailNow)
-	for _, testcase := range []struct {
+	for i, testcase := range []struct {
 		m *Machine
 		s string
 	}{
@@ -70,9 +100,7 @@ func TestExpr(t *testing.T) {
 			s0$
 				'a'     s1
 			s1
-				'b'     s2
-			s2$
-				'a'     s1
+				'b'     s0
 		`},
 		{
 			oneOrMore(s("ab")), `
@@ -84,7 +112,7 @@ func TestExpr(t *testing.T) {
 				'a'     s1
 		`},
 		{
-			threeToken(), `
+			threeToken, `
 			s0
 				'0'     s1
 				'1'-'9' s2
@@ -134,25 +162,73 @@ func TestExpr(t *testing.T) {
 				80-8f   s4
 			`,
 		},
+		{
+			bsas, `
+			s0$
+				'a'     s1
+				'b'     s0
+			s1
+				'a'     s0
+				'b'     s1
+		`},
+		{
+			bsas.Complement(), `
+			s0
+				'a'     s1
+				'b'     s0
+			s1$
+				'a'     s0
+				'b'     s1
+		`},
+		{
+			or(bsas, asbs.Complement()), `
+			s0$
+				'a'     s1
+				'b'     s2
+			s1
+				'a'     s0
+				'b'     s3
+			s2$
+				'a'     s3
+				'b'     s0
+			s3$
+				'a'     s2
+				'b'     s1
+			`,
+		},
+		{
+			and(bsas, asbs.Complement()), `
+			s0
+				'a'     s1
+				'b'     s2
+			s1
+				'a'     s0
+				'b'     s3
+			s2$
+				'a'     s3
+				'b'     s0
+			s3
+				'a'     s2
+				'b'     s1
+			`,
+		},
+		{
+			bsas.Exclude(asbs.Complement()), `
+			s0$
+				'a'     s1
+				'b'     s2
+			s1
+				'a'     s0
+				'b'     s3
+			s2
+				'a'     s3
+				'b'     s0
+			s3
+				'a'     s2
+				'b'     s1
+			`,
+		},
 	} {
-		expect(testcase.m.dump()).Equal(gspec.Unindent(testcase.s))
+		expect(fmt.Sprintf("dump of test case %d", i), testcase.m.dump()).Equal(gspec.Unindent(testcase.s))
 	}
-}
-
-const (
-	hexLabel = iota
-	decimalLabel
-	identLabel
-)
-
-func threeToken() *Machine {
-	decimalDigit := b('0', '9')
-	hexDigit := or(b('0', '9'), b('a', 'f'), b('A', 'F'))
-	letter := or(b('a', 'z'), b('A', 'Z'))
-
-	hexLit := con(s(`0`), c(`xX`), oneOrMore(hexDigit)).As(hexLabel)
-	decimalLit := oneOrMore(decimalDigit).As(decimalLabel)
-	ident := con(letter, zeroOrMore(or(letter, decimalDigit))).As(identLabel)
-
-	return or(hexLit, decimalLit, ident)
 }
