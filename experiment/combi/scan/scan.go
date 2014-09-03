@@ -7,7 +7,7 @@ import (
 )
 
 type Scanner struct {
-	*Matcher
+	Matcher *TokenMatcher
 
 	src []byte
 	p   int
@@ -34,9 +34,9 @@ func (s *Scanner) Scan() bool {
 	s.p += size
 
 	switch id {
-	case s.Matcher.eof:
+	case s.Matcher.EOF:
 		s.err = io.EOF
-	case s.Matcher.illegal:
+	case s.Matcher.Illegal:
 		s.err = invalidInputError(buf)
 		return false
 	}

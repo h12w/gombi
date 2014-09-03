@@ -2,10 +2,8 @@ package scanner
 
 import (
 	"go/token"
-	"unicode/utf8"
 
-	"github.com/hailiang/dfa"
-	"github.com/hailiang/gombi/scan"
+	"github.com/hailiang/gombi/experiment/combi/scan"
 )
 
 const (
@@ -22,44 +20,34 @@ const (
 var (
 	c          = scan.Char
 	b          = scan.Between
+	merge      = scan.Merge
 	s          = scan.Str
 	con        = scan.Con
 	or         = scan.Or
 	zeroOrOne  = scan.ZeroOrOne
 	zeroOrMore = scan.ZeroOrMore
 	oneOrMore  = scan.OneOrMore
-	bb         = scan.BetweenByte
+	repeat     = scan.Repeat
 
 	illegal     = c("\x00")
-	any         = b(0, utf8.MaxRune).Exclude(illegal)
+	any         = illegal.Negate()
 	newline     = c("\n")
 	unicodeChar = any.Exclude(newline)
 	//	unicodeLetter = c(`\p{L}`)
 	//	unicodeDigit  = c(`\p{Nd}`)
-	unicodeLetter = or(b('A', 'Z'), b('a', 'z'), c(`۰۱۸६४ŝ`))
-	unicodeDigit  = or(decimalDigit, c(`９８７６`))
-	letter        = or(unicodeLetter, c(`_`))
+	unicodeLetter = merge(b('A', 'Z'), b('a', 'z'), c(`۰۱۸६४ŝ`))
+	unicodeDigit  = merge(decimalDigit, c(`９８７６`))
+	letter        = merge(unicodeLetter, c(`_`))
 	decimalDigit  = b('0', '9')
 	octalDigit    = b('0', '7')
-	hexDigit      = or(b('0', '9'), b('A', 'F'), b('a', 'f'))
+	hexDigit      = merge(b('0', '9'), b('A', 'F'), b('a', 'f'))
 
 	empty = s(``)
 
-	whitespaces    = oneOrMore(c(" \t\r"))
-	lineComment    = con(s(`//`), zeroOrMore(unicodeChar), or(newline, empty))
-	generalComment = func(text *dfa.Machine) *dfa.Machine {
-		// http://www.cs.dartmouth.edu/~mckeeman/cs118/assignments/comment.html
-		return con(
-			s(`/*`),
-			con(text.Exclude(s(`*`)).ZeroOrMore(), s(`*`).OneOrMore()).Loop(
-				func(b byte) bool {
-					return b != '/'
-				}),
-			s(`/`),
-		)
-	}
-	generalCommentSL     = generalComment(any.Exclude(newline))
-	generalCommentML     = generalComment(any)
+	whitespaces          = oneOrMore(c(" \t\r"))
+	lineComment          = con(s(`//`), zeroOrMore(unicodeChar), or(newline, empty))
+	generalCommentSL     = con(s(`/*`), zeroOrMore(any.Exclude(newline)).EndWith(s(`*/`)))
+	generalCommentML     = con(s(`/*`), zeroOrMore(any).EndWith(s(`*/`)))
 	identifier           = con(letter, zeroOrMore(or(letter, unicodeDigit)))
 	intLit               = or(hexLit, decimalLit, octalLit)
 	decimalLit           = con(b('1', '9'), zeroOrMore(decimalDigit))
@@ -73,21 +61,21 @@ var (
 	exponent             = con(c("eE"), zeroOrOne(c("+-")), decimals)
 	imaginaryLit         = con(or(floatLit, decimals), s(`i`))
 	runeLit              = con(s(`'`), or(byteValue, unicodeValue), s(`'`))
-	unicodeValue         = or(littleUValue, bigUValue, escapedChar, unicodeChar.Exclude(c(`'\`)))
-	unicodeStrValue      = or(unicodeChar.Exclude(c(`"\`)), littleUValue, bigUValue, escapedChar)
+	unicodeValue         = or(littleUValue, bigUValue, escapedChar, unicodeChar)
+	unicodeStrValue      = or(unicodeChar.Exclude(c(`"`)), littleUValue, bigUValue, escapedChar)
 	byteValue            = or(hexByteValue, octalByteValue)
-	octalByteValue       = con(s(`\`), octalDigit.Repeat(3))
-	hexByteValue         = con(s(`\x`), hexDigit.Repeat(2))
-	littleUValue         = con(s(`\u`), hexDigit.Repeat(4))
-	bigUValue            = con(s(`\U`), hexDigit.Repeat(8))
+	octalByteValue       = con(s(`\`), repeat(octalDigit, 3))
+	hexByteValue         = con(s(`\x`), repeat(hexDigit, 2))
+	littleUValue         = con(s(`\u`), repeat(hexDigit, 4))
+	bigUValue            = con(s(`\U`), repeat(hexDigit, 8))
 	escapedChar          = con(s(`\`), c(`abfnrtv\'"`))
 	rawStringLit         = con(s("`"), zeroOrMore(or(unicodeChar.Exclude(c("`")), newline)), s("`"))
 	interpretedStringLit = con(s(`"`), zeroOrMore(or(unicodeStrValue, byteValue)), s(`"`))
 
-	matcher = scan.NewMatcher(
-		int(token.EOF),
-		int(token.ILLEGAL),
-		[]scan.MID{
+	matcher = &scan.TokenMatcher{
+		EOF:     int(token.EOF),
+		Illegal: int(token.ILLEGAL),
+		Defs: []*scan.IDMatcher{
 			{whitespaces, tWhitespace},
 			{s("\n"), tNewline},
 			{s(`if`), int(token.IF)},
@@ -172,7 +160,7 @@ var (
 			{s(`>=`), int(token.GEQ)},
 			{s(`>`), int(token.GTR)},
 			{s(`;`), int(token.SEMICOLON)},
-		})
+		}}
 )
 
 type gombiScanner struct {

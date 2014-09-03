@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"unicode/utf8"
 
-	"github.com/hailiang/gombi/gre/scan"
+	"github.com/hailiang/gombi/experiment/combi/scan"
 )
 
 const (
@@ -209,12 +209,6 @@ func (s *Scanner) addLineFromValue(pos int, val []byte) (added bool) {
 	}
 	return
 }
-
-// 1. return the checked token
-// 2. return an inserted semi
-// 3. return one stored comments
-
-// need more lookahead?
 
 func isPreSemi(tok int) bool {
 	switch token.Token(tok) {
