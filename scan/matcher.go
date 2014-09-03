@@ -7,7 +7,7 @@ import (
 )
 
 type Matcher struct {
-	m       *dfa.Machine
+	fast    *dfa.FastM
 	eof     int
 	illegal int
 }
@@ -29,23 +29,24 @@ func NewMatcher(eof, illegal int, mids []MID) *Matcher {
 	return &Matcher{
 		eof:     eof,
 		illegal: illegal,
-		m:       m}
+		fast:    m.ToFast()}
 }
 
-func (m *Matcher) Match(buf []byte) (id, size int) {
-	if len(buf) == 0 {
-		return m.eof, 0
-	}
-	if size, label, ok := m.m.Match(buf); ok {
-		return label, size
-	}
-	return m.illegal, 1 // advance 1 byte when illegal
-}
+//func (m *Matcher) Match(buf []byte) (id, size int) {
+//	if len(buf) == 0 {
+//		id, size = m.eof, 0
+//	} else if si, label, ok := m.m.Match(buf); ok {
+//		id, size = label, si
+//	} else {
+//		id, size = m.illegal, 1 // advance 1 byte when illegal
+//	}
+//	return
+//}
 
-func (m *Matcher) SaveSVG(file string) error {
-	return m.m.SaveSVG(file)
-}
-
-func (m *Matcher) SaveDot(file string) error {
-	return m.m.SaveDot(file)
-}
+//func (m *Matcher) SaveSVG(file string) error {
+//	return m.m.SaveSVG(file)
+//}
+//
+//func (m *Matcher) SaveDot(file string) error {
+//	return m.m.SaveDot(file)
+//}

@@ -29,6 +29,7 @@ type Scanner struct {
 
 	commentQueue tokenQueue
 	endOfLine    int
+	tokBuf       scan.Token
 
 	file *token.File  // source file handle
 	dir  string       // directory portion of file.Name()
@@ -68,21 +69,22 @@ func (s *Scanner) Init(file *token.File, src []byte, err ErrorHandler, mode Mode
 	s.commentQueue.reset()
 }
 
+var newlineValue = []byte{'\n'}
+
 func (s *Scanner) insertSemi() *scan.Token {
 	if s.mode&dontInsertSemis == 0 &&
 		s.lastIsPreSemi {
-		return &scan.Token{
-			ID:    int(token.SEMICOLON),
-			Value: []byte{'\n'},
-			Pos:   s.endOfLinePos,
-		}
+		s.tokBuf.ID = int(token.SEMICOLON)
+		s.tokBuf.Value = newlineValue
+		s.tokBuf.Pos = s.endOfLinePos
+		return &s.tokBuf
 	}
 	return nil
 }
 
 var skipToken = &scan.Token{ID: tSkip}
 
-func (s *Scanner) scan() *scan.Token {
+func (s *Scanner) scanToken() *scan.Token {
 	if s.commentQueue.count() > 0 {
 		return s.commentQueue.pop()
 	}
@@ -226,19 +228,8 @@ func (s *Scanner) Scan() (token.Pos, token.Token, string) {
 		return s.file.Pos(s.Pos()), token.EOF, ""
 	}
 	var t *scan.Token
-	defer func() {
-		if t.ID != int(token.ILLEGAL) {
-			s.endOfLinePos = s.Pos() + 1
-			s.lastIsPreSemi = isPreSemi(t.ID)
-		}
-		if s.lastIsPreSemi {
-			s.commentAfterPreSemi = false
-		}
-		//fmt.Println("scan return:", t.ID, strconv.Quote(string(t.Value)), s.lastIsPreSemi)
-	}()
-
 	for {
-		t = s.scan()
+		t = s.scanToken()
 		if t.ID == int(token.ILLEGAL) {
 			//fmt.Println("scan error", s.Error()) // DEBUG
 			break
@@ -246,6 +237,13 @@ func (s *Scanner) Scan() (token.Pos, token.Token, string) {
 			continue
 		}
 		break
+	}
+	if t.ID != int(token.ILLEGAL) {
+		s.endOfLinePos = s.Pos() + 1
+		s.lastIsPreSemi = isPreSemi(t.ID)
+	}
+	if s.lastIsPreSemi {
+		s.commentAfterPreSemi = false
 	}
 	return s.file.Pos(t.Pos), token.Token(t.ID), string(t.Value)
 }

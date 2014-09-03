@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+
+	"github.com/hailiang/dfa"
 )
 
 type Scanner struct {
@@ -11,6 +13,7 @@ type Scanner struct {
 
 	src []byte
 	p   int
+	s0  *dfa.FastS
 
 	tok Token
 	err error
@@ -27,20 +30,47 @@ func (s *Scanner) Scan() bool {
 	}
 
 	buf := s.src[s.p:]
-	id, size := s.Matcher.Match(buf)
-	s.tok.ID = id
-	s.tok.Value = buf[:size]
 	s.tok.Pos = s.p
-	s.p += size
-
-	switch id {
-	case s.Matcher.eof:
+	if len(buf) == 0 {
+		s.tok.ID = s.eof
+		s.tok.Value = nil
 		s.err = io.EOF
-	case s.Matcher.illegal:
-		s.err = invalidInputError(buf)
 		return false
 	}
-	return true
+	{
+		var (
+			cur        = s.s0
+			pos        = s.p
+			matched    = false
+			matchedPos = pos
+		)
+		for {
+			if cur.Label >= 0 {
+				matchedPos = pos
+				s.tok.ID = cur.Label
+				matched = true
+			}
+			if pos == len(s.src) {
+				break
+			}
+			cur = cur.Trans[s.src[pos]]
+			if cur == nil {
+				break
+			}
+			pos++
+		}
+		if matched {
+			size := matchedPos - s.p
+			s.tok.Value = buf[:size]
+			s.p += size
+			return true
+		}
+	}
+	s.tok.ID = s.illegal
+	s.tok.Value = buf[:1] // advance 1 byte when illegal
+	s.err = invalidInputError(buf)
+	s.p++
+	return false
 }
 func invalidInputError(buf []byte) error {
 	return fmt.Errorf("token pattern does not match input from %s.", strconv.Quote(string(prefix(buf, 20))))
@@ -57,6 +87,7 @@ func (s *Scanner) SetSource(src []byte) {
 	s.p = 0
 	s.tok = Token{}
 	s.err = nil
+	s.s0 = &s.fast.States[0]
 }
 
 func (s *Scanner) Pos() int {
