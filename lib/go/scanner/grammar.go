@@ -19,66 +19,71 @@ const (
 	tSkip
 )
 
-var (
-	c     = scan.Char
-	b     = scan.Between
-	s     = scan.Str
-	con   = scan.Con
-	or    = scan.Or
-	ifNot = scan.IfNot
-	class = scan.CharClass
+var globalMatcher *scan.Matcher
 
-	any           = b(1, utf8.MaxRune)
-	newline       = c("\n")
-	unicodeChar   = any.Exclude(newline)
-	unicodeLetter = class(`L`)
-	unicodeDigit  = class(`Nd`)
-	letter        = or(unicodeLetter, c(`_`))
-	decimalDigit  = b('0', '9')
-	octalDigit    = b('0', '7')
-	hexDigit      = or(b('0', '9'), b('A', 'F'), b('a', 'f'))
-
-	empty = s(``)
-
-	whitespaces = c(" \t\r").OneOrMore()
-	lineComment = con(s(`//`), unicodeChar.ZeroOrMore(), or(newline, empty))
-	// http://www.cs.dartmouth.edu/~mckeeman/cs118/assignments/comment.html
-	commentText = func(char *dfa.M) *dfa.M {
-		return con(char.Exclude(c(`*`)).ZeroOrMore(), s(`*`)).Loop(ifNot('/'))
+func getMatcher() *scan.Matcher {
+	if globalMatcher != nil {
+		return globalMatcher
 	}
-	generalCommentSL = con(s(`/*`), commentText(any.Exclude(s("\n"))), s(`/`))
-	generalCommentML = con(s(`/*`), commentText(any.Exclude(s("\n"))).ZeroOrOne(), s("\n"), commentText(any), s(`/`))
 
-	identifier = con(letter, or(letter, unicodeDigit).ZeroOrMore()).Exclude(keywords)
+	var (
+		c     = scan.Char
+		b     = scan.Between
+		s     = scan.Str
+		con   = scan.Con
+		or    = scan.Or
+		ifNot = scan.IfNot
+		class = scan.CharClass
 
-	intLit               = or(hexLit, decimalLit, octalLit)
-	decimalLit           = con(b('1', '9'), decimalDigit.ZeroOrMore())
-	octalLit             = con(s(`0`), octalDigit.ZeroOrMore())
-	hexLit               = con(s(`0`), c("xX"), hexDigit.OneOrMore())
-	floatLit             = or(floatLit1, floatLit2, floatLit3)
-	floatLit1            = con(decimals, s(`.`), decimals.ZeroOrOne(), exponent.ZeroOrOne())
-	floatLit2            = con(decimals, exponent)
-	floatLit3            = con(s(`.`), decimals, exponent.ZeroOrOne())
-	decimals             = decimalDigit.OneOrMore()
-	exponent             = con(c("eE"), c("+-").ZeroOrOne(), decimals)
-	imaginaryLit         = con(or(floatLit, decimals), s(`i`))
-	runeLit              = con(s(`'`), or(byteValue, unicodeValue.Exclude(s(`'`))), s(`'`))
-	unicodeValue         = or(unicodeChar.Exclude(c(`\`)), littleUValue, bigUValue, escapedChar)
-	byteValue            = or(hexByteValue, octalByteValue)
-	octalByteValue       = con(s(`\`), octalDigit.Repeat(3))
-	hexByteValue         = con(s(`\x`), hexDigit.Repeat(2))
-	littleUValue         = con(s(`\u`), hexDigit.Repeat(4))
-	bigUValue            = con(s(`\U`), hexDigit.Repeat(8))
-	escapedChar          = con(s(`\`), c(`abfnrtv\'"`))
-	rawStringLit         = con(s("`"), or(unicodeChar.Exclude(c("`")), newline).ZeroOrMore(), s("`"))
-	interpretedStringLit = con(s(`"`), or(unicodeValue.Exclude(s(`"`)), byteValue).ZeroOrMore(), s(`"`))
-	keywords             = or(s(`break`), s(`case`), s(`chan`), s(`const`),
-		s(`continue`), s(`default`), s(`defer`), s(`else`), s(`fallthrough`),
-		s(`for`), s(`func`), s(`go`), s(`goto`), s(`if`), s(`import`),
-		s(`interface`), s(`map`), s(`package`), s(`range`), s(`return`),
-		s(`select`), s(`struct`), s(`switch`), s(`type`), s(`var`))
+		any           = b(1, utf8.MaxRune)
+		newline       = c("\n")
+		unicodeChar   = any.Exclude(newline)
+		unicodeLetter = class(`L`)
+		unicodeDigit  = class(`Nd`)
+		letter        = or(unicodeLetter, c(`_`))
+		decimalDigit  = b('0', '9')
+		octalDigit    = b('0', '7')
+		hexDigit      = or(b('0', '9'), b('A', 'F'), b('a', 'f'))
 
-	matcher = scan.NewMatcher(
+		empty = s(``)
+
+		whitespaces = c(" \t\r").OneOrMore()
+		lineComment = con(s(`//`), unicodeChar.ZeroOrMore(), or(newline, empty))
+		// http://www.cs.dartmouth.edu/~mckeeman/cs118/assignments/comment.html
+		commentText = func(char *dfa.M) *dfa.M {
+			return con(char.Exclude(c(`*`)).ZeroOrMore(), s(`*`)).Loop(ifNot('/'))
+		}
+		generalCommentSL = con(s(`/*`), commentText(any.Exclude(s("\n"))), s(`/`))
+		generalCommentML = con(s(`/*`), commentText(any.Exclude(s("\n"))).ZeroOrOne(), s("\n"), commentText(any), s(`/`))
+		keywords         = or(s(`break`), s(`case`), s(`chan`), s(`const`),
+			s(`continue`), s(`default`), s(`defer`), s(`else`), s(`fallthrough`),
+			s(`for`), s(`func`), s(`go`), s(`goto`), s(`if`), s(`import`),
+			s(`interface`), s(`map`), s(`package`), s(`range`), s(`return`),
+			s(`select`), s(`struct`), s(`switch`), s(`type`), s(`var`))
+		identifier           = con(letter, or(letter, unicodeDigit).ZeroOrMore()).Exclude(keywords)
+		hexLit               = con(s(`0`), c("xX"), hexDigit.OneOrMore())
+		decimalLit           = con(b('1', '9'), decimalDigit.ZeroOrMore())
+		octalLit             = con(s(`0`), octalDigit.ZeroOrMore())
+		intLit               = or(hexLit, decimalLit, octalLit)
+		decimals             = decimalDigit.OneOrMore()
+		exponent             = con(c("eE"), c("+-").ZeroOrOne(), decimals)
+		floatLit1            = con(decimals, s(`.`), decimals.ZeroOrOne(), exponent.ZeroOrOne())
+		floatLit2            = con(decimals, exponent)
+		floatLit3            = con(s(`.`), decimals, exponent.ZeroOrOne())
+		floatLit             = or(floatLit1, floatLit2, floatLit3)
+		imaginaryLit         = con(or(floatLit, decimals), s(`i`))
+		hexByteValue         = con(s(`\x`), hexDigit.Repeat(2))
+		octalByteValue       = con(s(`\`), octalDigit.Repeat(3))
+		byteValue            = or(hexByteValue, octalByteValue)
+		littleUValue         = con(s(`\u`), hexDigit.Repeat(4))
+		bigUValue            = con(s(`\U`), hexDigit.Repeat(8))
+		escapedChar          = con(s(`\`), c(`abfnrtv\'"`))
+		unicodeValue         = or(unicodeChar.Exclude(c(`\`)), littleUValue, bigUValue, escapedChar)
+		runeLit              = con(s(`'`), or(byteValue, unicodeValue.Exclude(s(`'`))), s(`'`))
+		rawStringLit         = con(s("`"), or(unicodeChar.Exclude(c("`")), newline).ZeroOrMore(), s("`"))
+		interpretedStringLit = con(s(`"`), or(unicodeValue.Exclude(s(`"`)), byteValue).ZeroOrMore(), s(`"`))
+	)
+	globalMatcher = scan.NewMatcher(
 		int(token.EOF),
 		int(token.ILLEGAL),
 		[]scan.MID{
@@ -167,12 +172,23 @@ var (
 			{s(`>`), int(token.GTR)},
 			{s(`;`), int(token.SEMICOLON)},
 		})
-)
+
+	_ = lineComment
+	_ = generalCommentSL
+	_ = generalCommentML
+	_ = identifier
+	_ = intLit
+	_ = imaginaryLit
+	_ = runeLit
+	_ = rawStringLit
+	_ = interpretedStringLit
+	return globalMatcher
+}
 
 type gombiScanner struct {
 	scan.Scanner
 }
 
 func newGombiScanner() gombiScanner {
-	return gombiScanner{scan.Scanner{Matcher: matcher}}
+	return gombiScanner{scan.Scanner{Matcher: getMatcher()}}
 }
