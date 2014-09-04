@@ -20,24 +20,19 @@ const (
 )
 
 var (
-	c          = scan.Char
-	b          = scan.Between
-	s          = scan.Str
-	con        = scan.Con
-	or         = scan.Or
-	zeroOrOne  = scan.ZeroOrOne
-	zeroOrMore = scan.ZeroOrMore
-	oneOrMore  = scan.OneOrMore
-	bb         = scan.BetweenByte
+	c     = scan.Char
+	b     = scan.Between
+	s     = scan.Str
+	con   = scan.Con
+	or    = scan.Or
+	ifNot = scan.IfNot
+	class = scan.CharClass
 
-	illegal     = c("\x00")
-	any         = b(0, utf8.MaxRune).Exclude(illegal)
-	newline     = c("\n")
-	unicodeChar = any.Exclude(newline)
-	//	unicodeLetter = c(`\p{L}`)
-	//	unicodeDigit  = c(`\p{Nd}`)
-	unicodeLetter = or(b('A', 'Z'), b('a', 'z'), c(`۰۱۸६४ŝ`))
-	unicodeDigit  = or(decimalDigit, c(`９８７６`))
+	any           = b(1, utf8.MaxRune)
+	newline       = c("\n")
+	unicodeChar   = any.Exclude(newline)
+	unicodeLetter = class(`L`)
+	unicodeDigit  = class(`Nd`)
 	letter        = or(unicodeLetter, c(`_`))
 	decimalDigit  = b('0', '9')
 	octalDigit    = b('0', '7')
@@ -45,44 +40,43 @@ var (
 
 	empty = s(``)
 
-	whitespaces    = oneOrMore(c(" \t\r"))
-	lineComment    = con(s(`//`), zeroOrMore(unicodeChar), or(newline, empty))
-	generalComment = func(text *dfa.Machine) *dfa.Machine {
-		// http://www.cs.dartmouth.edu/~mckeeman/cs118/assignments/comment.html
-		return con(
-			s(`/*`),
-			con(text.Exclude(s(`*`)).ZeroOrMore(), s(`*`).OneOrMore()).Loop(
-				func(b byte) bool {
-					return b != '/'
-				}),
-			s(`/`),
-		)
+	whitespaces = c(" \t\r").OneOrMore()
+	lineComment = con(s(`//`), unicodeChar.ZeroOrMore(), or(newline, empty))
+	// http://www.cs.dartmouth.edu/~mckeeman/cs118/assignments/comment.html
+	commentText = func(char *dfa.M) *dfa.M {
+		return con(char.Exclude(c(`*`)).ZeroOrMore(), s(`*`)).Loop(ifNot('/'))
 	}
-	generalCommentSL     = generalComment(any.Exclude(newline))
-	generalCommentML     = generalComment(any)
-	identifier           = con(letter, zeroOrMore(or(letter, unicodeDigit)))
+	generalCommentSL = con(s(`/*`), commentText(any.Exclude(s("\n"))), s(`/`))
+	generalCommentML = con(s(`/*`), commentText(any.Exclude(s("\n"))).ZeroOrOne(), s("\n"), commentText(any), s(`/`))
+
+	identifier = con(letter, or(letter, unicodeDigit).ZeroOrMore()).Exclude(keywords)
+
 	intLit               = or(hexLit, decimalLit, octalLit)
-	decimalLit           = con(b('1', '9'), zeroOrMore(decimalDigit))
-	octalLit             = con(s(`0`), zeroOrMore(octalDigit))
-	hexLit               = con(s(`0`), c("xX"), oneOrMore(hexDigit))
+	decimalLit           = con(b('1', '9'), decimalDigit.ZeroOrMore())
+	octalLit             = con(s(`0`), octalDigit.ZeroOrMore())
+	hexLit               = con(s(`0`), c("xX"), hexDigit.OneOrMore())
 	floatLit             = or(floatLit1, floatLit2, floatLit3)
-	floatLit1            = con(decimals, s(`.`), zeroOrOne(decimals), zeroOrOne(exponent))
+	floatLit1            = con(decimals, s(`.`), decimals.ZeroOrOne(), exponent.ZeroOrOne())
 	floatLit2            = con(decimals, exponent)
-	floatLit3            = con(s(`.`), decimals, zeroOrOne(exponent))
-	decimals             = oneOrMore(decimalDigit)
-	exponent             = con(c("eE"), zeroOrOne(c("+-")), decimals)
+	floatLit3            = con(s(`.`), decimals, exponent.ZeroOrOne())
+	decimals             = decimalDigit.OneOrMore()
+	exponent             = con(c("eE"), c("+-").ZeroOrOne(), decimals)
 	imaginaryLit         = con(or(floatLit, decimals), s(`i`))
-	runeLit              = con(s(`'`), or(byteValue, unicodeValue), s(`'`))
-	unicodeValue         = or(littleUValue, bigUValue, escapedChar, unicodeChar.Exclude(c(`'\`)))
-	unicodeStrValue      = or(unicodeChar.Exclude(c(`"\`)), littleUValue, bigUValue, escapedChar)
+	runeLit              = con(s(`'`), or(byteValue, unicodeValue.Exclude(s(`'`))), s(`'`))
+	unicodeValue         = or(unicodeChar.Exclude(c(`\`)), littleUValue, bigUValue, escapedChar)
 	byteValue            = or(hexByteValue, octalByteValue)
 	octalByteValue       = con(s(`\`), octalDigit.Repeat(3))
 	hexByteValue         = con(s(`\x`), hexDigit.Repeat(2))
 	littleUValue         = con(s(`\u`), hexDigit.Repeat(4))
 	bigUValue            = con(s(`\U`), hexDigit.Repeat(8))
 	escapedChar          = con(s(`\`), c(`abfnrtv\'"`))
-	rawStringLit         = con(s("`"), zeroOrMore(or(unicodeChar.Exclude(c("`")), newline)), s("`"))
-	interpretedStringLit = con(s(`"`), zeroOrMore(or(unicodeStrValue, byteValue)), s(`"`))
+	rawStringLit         = con(s("`"), or(unicodeChar.Exclude(c("`")), newline).ZeroOrMore(), s("`"))
+	interpretedStringLit = con(s(`"`), or(unicodeValue.Exclude(s(`"`)), byteValue).ZeroOrMore(), s(`"`))
+	keywords             = or(s(`break`), s(`case`), s(`chan`), s(`const`),
+		s(`continue`), s(`default`), s(`defer`), s(`else`), s(`fallthrough`),
+		s(`for`), s(`func`), s(`go`), s(`goto`), s(`if`), s(`import`),
+		s(`interface`), s(`map`), s(`package`), s(`range`), s(`return`),
+		s(`select`), s(`struct`), s(`switch`), s(`type`), s(`var`))
 
 	matcher = scan.NewMatcher(
 		int(token.EOF),

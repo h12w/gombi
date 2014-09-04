@@ -15,4 +15,6 @@ var (
 	ZeroOrOne   = dfa.ZeroOrOne
 	ZeroOrMore  = dfa.ZeroOrMore
 	OneOrMore   = dfa.OneOrMore
+	IfNot       = dfa.IfNot
+	CharClass   = dfa.CharClass
 )

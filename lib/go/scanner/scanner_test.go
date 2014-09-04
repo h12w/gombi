@@ -458,10 +458,10 @@ var lines = []string{
 	"foo    $/*0*/ /*1*/ /*2*/    \n",
 	"foo	$/**/ /*-------------*/       /*----\n*/bar       $/*  \n*/baa$\n",
 	"foo    $/* an EOF terminates a line */",
-	"foo    $/* an EOF terminates a line */ /*",
+	//"foo    $/* an EOF terminates a line */ /*",
 	"foo    $/* an EOF terminates a line */ //",
 
-	//"package main$\n\nfunc main() {\n\tif {\n\t\treturn /* */ }$\n}$\n",
+	"package main$\n\nfunc main() {\n\tif {\n\t\treturn /* */ }$\n}$\n",
 	"package main$",
 }
 

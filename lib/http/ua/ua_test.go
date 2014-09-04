@@ -5,10 +5,8 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/hailiang/gspec"
 	"github.com/hailiang/gspec/core"
-	ge "github.com/hailiang/gspec/error"
-	exp "github.com/hailiang/gspec/expectation"
-	"github.com/hailiang/gspec/suite"
 	"github.com/ogdl/flow"
 )
 
@@ -72,9 +70,9 @@ var testcases = []struct {
 	},
 }
 
-var _ = suite.Add(func(s core.S) {
+var _ = gspec.Add(func(s core.S) {
 	testcase := s.Alias("testcase:")
-	expect := exp.Alias(s.FailNow)
+	expect := gspec.Expect(s.FailNow)
 	for i, tc := range testcases {
 		testcase(strconv.Itoa(i), func() {
 			r, err := ParseUserAgent(tc.str)

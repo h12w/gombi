@@ -29,9 +29,8 @@ func (s *Scanner) Scan() bool {
 		return false
 	}
 
-	buf := s.src[s.p:]
 	s.tok.Pos = s.p
-	if len(buf) == 0 {
+	if s.p >= len(s.src) {
 		s.tok.ID = s.eof
 		s.tok.Value = nil
 		s.err = io.EOF
@@ -46,29 +45,28 @@ func (s *Scanner) Scan() bool {
 		)
 		for {
 			if cur.Label >= 0 {
-				matchedPos = pos
 				s.tok.ID = cur.Label
+				matchedPos = pos
 				matched = true
 			}
 			if pos == len(s.src) {
 				break
 			}
-			cur = cur.Trans[s.src[pos]]
-			if cur == nil {
+			if cur = cur.Trans[s.src[pos]]; cur == nil {
 				break
 			}
 			pos++
 		}
 		if matched {
 			size := matchedPos - s.p
-			s.tok.Value = buf[:size]
+			s.tok.Value = s.src[s.p:matchedPos]
 			s.p += size
 			return true
 		}
 	}
 	s.tok.ID = s.illegal
-	s.tok.Value = buf[:1] // advance 1 byte when illegal
-	s.err = invalidInputError(buf)
+	s.tok.Value = s.src[s.p : s.p+1] // advance 1 byte when illegal
+	s.err = invalidInputError(s.src[s.p:])
 	s.p++
 	return false
 }

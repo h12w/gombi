@@ -3,8 +3,8 @@ package ua
 import (
 	"io"
 
+	"github.com/hailiang/gombi/experiment/gre/scan"
 	"github.com/hailiang/gombi/parse"
-	"github.com/hailiang/gombi/scan"
 )
 
 var (
@@ -87,7 +87,7 @@ func newScanner() *switchScanner {
 			{commentText, tCommentText},
 		})
 
-		scanner = &switchScanner{scan.NewByteScanner(m), m, mc, 0}
+		scanner = &switchScanner{scan.NewScanner(m), m, mc, 0}
 	)
 	return scanner
 }

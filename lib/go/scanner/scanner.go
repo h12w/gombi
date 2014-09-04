@@ -90,7 +90,6 @@ func (s *Scanner) scanToken() *scan.Token {
 	}
 	s.gombiScanner.Scan()
 	t := s.Token()
-	//fmt.Println("scanning:", t.ID, strconv.Quote(string(t.Value)), s.lastIsPreSemi)
 
 	// add line
 	switch token.Token(t.ID) {
@@ -147,6 +146,7 @@ func (s *Scanner) scanToken() *scan.Token {
 				s.commentQueue.push(t)
 				s.gombiScanner.Scan()
 				t = s.Token()
+
 				//fmt.Println("SL scanning:", t.ID, strconv.Quote(string(t.Value)), s.lastIsPreSemi)
 				switch t.ID {
 				case int(token.EOF), tNewline, tLineComment, tGeneralCommentML:
@@ -230,20 +230,16 @@ func (s *Scanner) Scan() (token.Pos, token.Token, string) {
 	var t *scan.Token
 	for {
 		t = s.scanToken()
-		if t.ID == int(token.ILLEGAL) {
-			//fmt.Println("scan error", s.Error()) // DEBUG
+		if t.ID != tSkip {
 			break
-		} else if t.ID == tSkip {
-			continue
 		}
-		break
 	}
 	if t.ID != int(token.ILLEGAL) {
 		s.endOfLinePos = s.Pos() + 1
 		s.lastIsPreSemi = isPreSemi(t.ID)
-	}
-	if s.lastIsPreSemi {
-		s.commentAfterPreSemi = false
+		if s.lastIsPreSemi {
+			s.commentAfterPreSemi = false
+		}
 	}
 	return s.file.Pos(t.Pos), token.Token(t.ID), string(t.Value)
 }
