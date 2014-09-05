@@ -90,122 +90,105 @@ func (s *Scanner) scanToken() *scan.Token {
 	}
 	s.gombiScanner.Scan()
 	t := s.Token()
-
-	// add line
-	switch token.Token(t.ID) {
-	case tNewline:
-		s.file.AddLine(t.Pos + 1)
-	case tLineComment, tGeneralCommentML, tRawStringLit:
-		s.addLineFromValue(t.Pos, t.Value)
-	}
-
-	if s.lastIsPreSemi {
-		switch token.Token(t.ID) {
-		case tLineComment, tGeneralCommentSL, tGeneralCommentML:
-			s.commentAfterPreSemi = true
-		}
-	}
-
-	// skip whitespace
-	if t.ID == int(tWhitespace) {
-		if s.lastIsPreSemi && !s.commentAfterPreSemi {
-			s.endOfLinePos = s.Pos() + 1
-		}
-		return skipToken
-	}
-
 	// supress value for operations
 	if t.ID != int(token.SEMICOLON) && firstOp <= t.ID && t.ID <= lastOp {
 		t.Value = nil
 		return t
 	}
-
-	// insert semi
-
 	switch token.Token(t.ID) {
+	case tWhitespace: // skip whitespace
+		if s.lastIsPreSemi && !s.commentAfterPreSemi {
+			s.endOfLinePos = s.Pos() + 1
+		}
+		return skipToken
+	// add newline
 	case tNewline:
+		s.file.AddLine(t.Pos + 1)
 		if semi := s.insertSemi(); semi != nil {
 			return semi
 		}
 		return skipToken
-	case token.EOF:
-		if semi := s.insertSemi(); semi != nil {
-			return semi
-		}
-		return t
-	case tLineComment, tGeneralCommentML:
-		if semi := s.insertSemi(); semi != nil {
-			modify(t)
-			s.commentQueue.push(t)
-			return semi
-		}
-	case tGeneralCommentSL:
-		if semi := s.insertSemi(); semi != nil {
-			for {
-				modify(t)
-				s.commentQueue.push(t)
-				s.gombiScanner.Scan()
-				t = s.Token()
-
-				//fmt.Println("SL scanning:", t.ID, strconv.Quote(string(t.Value)), s.lastIsPreSemi)
-				switch t.ID {
-				case int(token.EOF), tNewline, tLineComment, tGeneralCommentML:
-					modify(t)
-					s.commentQueue.push(t)
-					return semi
-				case tGeneralCommentSL:
-					modify(t)
-					s.commentQueue.push(t)
-				case tWhitespace:
-				default:
-					modify(t)
-					s.commentQueue.push(t)
-					return skipToken
-				}
-			}
-		}
-	}
-
-	// skip comments
-	if s.mode&ScanComments == 0 {
-		switch token.Token(t.ID) {
-		case tLineComment, tGeneralCommentSL, tGeneralCommentML:
-			return skipToken
-		}
-	}
-
-	modify(t)
-	return t
-}
-
-func modify(t *scan.Token) {
-	// modify tokens
-	switch token.Token(t.ID) {
 	case tLineComment:
+		s.addLineFromValue()
+		if s.lastIsPreSemi {
+			s.commentAfterPreSemi = true
+		}
+
+		// modify
 		t.ID = int(token.COMMENT)
 		if t.Value[len(t.Value)-1] == '\n' {
 			t.Value = t.Value[:len(t.Value)-1]
 		}
 		t.Value = stripCR(t.Value)
-	case tGeneralCommentSL:
-		t.ID = int(token.COMMENT)
-		t.Value = stripCR(t.Value)
+
+		if semi := s.insertSemi(); semi != nil {
+			s.commentQueue.push(t)
+			return semi
+		}
+		if s.mode&ScanComments == 0 {
+			return skipToken
+		}
 	case tGeneralCommentML:
+		s.addLineFromValue()
+		if s.lastIsPreSemi {
+			s.commentAfterPreSemi = true
+		}
 		t.ID = int(token.COMMENT)
 		t.Value = stripCR(t.Value)
-	case tRawStringLit:
-		t.ID = int(token.STRING)
+		if semi := s.insertSemi(); semi != nil {
+			s.commentQueue.push(t)
+			return semi
+		}
+		if s.mode&ScanComments == 0 {
+			return skipToken
+		}
+	case tGeneralCommentSL:
+		if s.lastIsPreSemi {
+			s.commentAfterPreSemi = true
+		}
+		t.ID = int(token.COMMENT)
 		t.Value = stripCR(t.Value)
+		if semi := s.insertSemi(); semi != nil {
+			for {
+				s.commentQueue.push(t)
+				s.gombiScanner.Scan()
+				t = s.Token()
+				switch t.ID {
+				case int(token.EOF), tNewline, tLineComment, tGeneralCommentML:
+					s.commentQueue.push(t)
+					return semi
+				case tGeneralCommentSL:
+					s.commentQueue.push(t)
+				case tWhitespace:
+				default:
+					s.commentQueue.push(t)
+					return skipToken
+				}
+			}
+		}
+		if s.mode&ScanComments == 0 {
+			return skipToken
+		}
 	case tInterpretedStringLit:
 		t.ID = int(token.STRING)
+	case tRawStringLit:
+		s.addLineFromValue()
+		t.ID = int(token.STRING)
+		t.Value = stripCR(t.Value)
+	case token.EOF:
+		if semi := s.insertSemi(); semi != nil {
+			return semi
+		}
+		return t
 	}
 
+	return t
 }
 
-func (s *Scanner) addLineFromValue(pos int, val []byte) (added bool) {
-	for i, c := range val {
+func (s *Scanner) addLineFromValue() (added bool) {
+	for i, c := range s.Token().Value {
 		if c == '\n' {
-			s.file.AddLine(pos + i)
+			s.file.AddLine(s.Token().Pos + i + 1)
 			added = true
 		}
 	}

@@ -22,10 +22,17 @@ const (
 var globalMatcher *scan.Matcher
 
 func getMatcher() *scan.Matcher {
-	if globalMatcher != nil {
-		return globalMatcher
+	if globalMatcher == nil {
+		globalMatcher = scan.NewMatcher(
+			int(token.EOF),
+			int(token.ILLEGAL),
+			tokenDefs(),
+		)
 	}
+	return globalMatcher
+}
 
+func tokenDefs() []scan.MID {
 	var (
 		c     = scan.Char
 		b     = scan.Between
@@ -83,106 +90,96 @@ func getMatcher() *scan.Matcher {
 		rawStringLit         = con(s("`"), or(unicodeChar.Exclude(c("`")), newline).ZeroOrMore(), s("`"))
 		interpretedStringLit = con(s(`"`), or(unicodeValue.Exclude(s(`"`)), byteValue).ZeroOrMore(), s(`"`))
 	)
-	globalMatcher = scan.NewMatcher(
-		int(token.EOF),
-		int(token.ILLEGAL),
-		[]scan.MID{
-			{whitespaces, tWhitespace},
-			{s("\n"), tNewline},
-			{s(`if`), int(token.IF)},
-			{s(`break`), int(token.BREAK)},
-			{s(`case`), int(token.CASE)},
-			{s(`chan`), int(token.CHAN)},
-			{s(`const`), int(token.CONST)},
-			{s(`continue`), int(token.CONTINUE)},
-			{s(`default`), int(token.DEFAULT)},
-			{s(`defer`), int(token.DEFER)},
-			{s(`else`), int(token.ELSE)},
-			{s(`fallthrough`), int(token.FALLTHROUGH)},
-			{s(`for`), int(token.FOR)},
-			{s(`func`), int(token.FUNC)},
-			{s(`goto`), int(token.GOTO)},
-			{s(`go`), int(token.GO)},
-			{s(`import`), int(token.IMPORT)},
-			{s(`interface`), int(token.INTERFACE)},
-			{s(`map`), int(token.MAP)},
-			{s(`package`), int(token.PACKAGE)},
-			{s(`range`), int(token.RANGE)},
-			{s(`return`), int(token.RETURN)},
-			{s(`select`), int(token.SELECT)},
-			{s(`struct`), int(token.STRUCT)},
-			{s(`switch`), int(token.SWITCH)},
-			{s(`type`), int(token.TYPE)},
-			{s(`var`), int(token.VAR)},
-			{identifier, int(token.IDENT)},
-			{lineComment, tLineComment},
-			{generalCommentSL, tGeneralCommentSL},
-			{generalCommentML, tGeneralCommentML},
-			{runeLit, int(token.CHAR)},
-			{imaginaryLit, int(token.IMAG)},
-			{floatLit, int(token.FLOAT)},
-			{intLit, int(token.INT)},
-			{rawStringLit, tRawStringLit},
-			{interpretedStringLit, tInterpretedStringLit},
-			{s(`...`), int(token.ELLIPSIS)},
-			{s(`.`), int(token.PERIOD)},
-			{s(`(`), int(token.LPAREN)},
-			{s(`)`), int(token.RPAREN)},
-			{s(`{`), int(token.LBRACE)},
-			{s(`}`), int(token.RBRACE)},
-			{s(`,`), int(token.COMMA)},
-			{s(`==`), int(token.EQL)},
-			{s(`=`), int(token.ASSIGN)},
-			{s(`:=`), int(token.DEFINE)},
-			{s(`:`), int(token.COLON)},
-			{s(`[`), int(token.LBRACK)},
-			{s(`]`), int(token.RBRACK)},
-			{s(`*=`), int(token.MUL_ASSIGN)},
-			{s(`*`), int(token.MUL)},
-			{s(`+=`), int(token.ADD_ASSIGN)},
-			{s(`++`), int(token.INC)},
-			{s(`+`), int(token.ADD)},
-			{s(`-=`), int(token.SUB_ASSIGN)},
-			{s(`--`), int(token.DEC)},
-			{s(`-`), int(token.SUB)},
-			{s(`/=`), int(token.QUO_ASSIGN)},
-			{s(`/`), int(token.QUO)},
-			{s(`%=`), int(token.REM_ASSIGN)},
-			{s(`%`), int(token.REM)},
-			{s(`|=`), int(token.OR_ASSIGN)},
-			{s(`||`), int(token.LOR)},
-			{s(`|`), int(token.OR)},
-			{s(`^=`), int(token.XOR_ASSIGN)},
-			{s(`^`), int(token.XOR)},
-			{s(`<<=`), int(token.SHL_ASSIGN)},
-			{s(`<<`), int(token.SHL)},
-			{s(`>>=`), int(token.SHR_ASSIGN)},
-			{s(`>>`), int(token.SHR)},
-			{s(`&^=`), int(token.AND_NOT_ASSIGN)},
-			{s(`&^`), int(token.AND_NOT)},
-			{s(`&=`), int(token.AND_ASSIGN)},
-			{s(`&&`), int(token.LAND)},
-			{s(`&`), int(token.AND)},
-			{s(`!=`), int(token.NEQ)},
-			{s(`!`), int(token.NOT)},
-			{s(`<=`), int(token.LEQ)},
-			{s(`<-`), int(token.ARROW)},
-			{s(`<`), int(token.LSS)},
-			{s(`>=`), int(token.GEQ)},
-			{s(`>`), int(token.GTR)},
-			{s(`;`), int(token.SEMICOLON)},
-		})
+	return []scan.MID{
+		{whitespaces, tWhitespace},
+		{s("\n"), tNewline},
+		{s(`if`), int(token.IF)},
+		{s(`break`), int(token.BREAK)},
+		{s(`case`), int(token.CASE)},
+		{s(`chan`), int(token.CHAN)},
+		{s(`const`), int(token.CONST)},
+		{s(`continue`), int(token.CONTINUE)},
+		{s(`default`), int(token.DEFAULT)},
+		{s(`defer`), int(token.DEFER)},
+		{s(`else`), int(token.ELSE)},
+		{s(`fallthrough`), int(token.FALLTHROUGH)},
+		{s(`for`), int(token.FOR)},
+		{s(`func`), int(token.FUNC)},
+		{s(`goto`), int(token.GOTO)},
+		{s(`go`), int(token.GO)},
+		{s(`import`), int(token.IMPORT)},
+		{s(`interface`), int(token.INTERFACE)},
+		{s(`map`), int(token.MAP)},
+		{s(`package`), int(token.PACKAGE)},
+		{s(`range`), int(token.RANGE)},
+		{s(`return`), int(token.RETURN)},
+		{s(`select`), int(token.SELECT)},
+		{s(`struct`), int(token.STRUCT)},
+		{s(`switch`), int(token.SWITCH)},
+		{s(`type`), int(token.TYPE)},
+		{s(`var`), int(token.VAR)},
+		{identifier, int(token.IDENT)},
+		{lineComment, tLineComment},
+		{generalCommentSL, tGeneralCommentSL},
+		{generalCommentML, tGeneralCommentML},
+		{runeLit, int(token.CHAR)},
+		{imaginaryLit, int(token.IMAG)},
+		{floatLit, int(token.FLOAT)},
+		{intLit, int(token.INT)},
+		{rawStringLit, tRawStringLit},
+		{interpretedStringLit, tInterpretedStringLit},
+		{s(`...`), int(token.ELLIPSIS)},
+		{s(`.`), int(token.PERIOD)},
+		{s(`(`), int(token.LPAREN)},
+		{s(`)`), int(token.RPAREN)},
+		{s(`{`), int(token.LBRACE)},
+		{s(`}`), int(token.RBRACE)},
+		{s(`,`), int(token.COMMA)},
+		{s(`==`), int(token.EQL)},
+		{s(`=`), int(token.ASSIGN)},
+		{s(`:=`), int(token.DEFINE)},
+		{s(`:`), int(token.COLON)},
+		{s(`[`), int(token.LBRACK)},
+		{s(`]`), int(token.RBRACK)},
+		{s(`*=`), int(token.MUL_ASSIGN)},
+		{s(`*`), int(token.MUL)},
+		{s(`+=`), int(token.ADD_ASSIGN)},
+		{s(`++`), int(token.INC)},
+		{s(`+`), int(token.ADD)},
+		{s(`-=`), int(token.SUB_ASSIGN)},
+		{s(`--`), int(token.DEC)},
+		{s(`-`), int(token.SUB)},
+		{s(`/=`), int(token.QUO_ASSIGN)},
+		{s(`/`), int(token.QUO)},
+		{s(`%=`), int(token.REM_ASSIGN)},
+		{s(`%`), int(token.REM)},
+		{s(`|=`), int(token.OR_ASSIGN)},
+		{s(`||`), int(token.LOR)},
+		{s(`|`), int(token.OR)},
+		{s(`^=`), int(token.XOR_ASSIGN)},
+		{s(`^`), int(token.XOR)},
+		{s(`<<=`), int(token.SHL_ASSIGN)},
+		{s(`<<`), int(token.SHL)},
+		{s(`>>=`), int(token.SHR_ASSIGN)},
+		{s(`>>`), int(token.SHR)},
+		{s(`&^=`), int(token.AND_NOT_ASSIGN)},
+		{s(`&^`), int(token.AND_NOT)},
+		{s(`&=`), int(token.AND_ASSIGN)},
+		{s(`&&`), int(token.LAND)},
+		{s(`&`), int(token.AND)},
+		{s(`!=`), int(token.NEQ)},
+		{s(`!`), int(token.NOT)},
+		{s(`<=`), int(token.LEQ)},
+		{s(`<-`), int(token.ARROW)},
+		{s(`<`), int(token.LSS)},
+		{s(`>=`), int(token.GEQ)},
+		{s(`>`), int(token.GTR)},
+		{s(`;`), int(token.SEMICOLON)},
+	}
+}
 
-	_ = lineComment
-	_ = generalCommentSL
-	_ = generalCommentML
-	_ = identifier
-	_ = intLit
-	_ = imaginaryLit
-	_ = runeLit
-	_ = rawStringLit
-	_ = interpretedStringLit
-	return globalMatcher
+func init() {
+	getMatcher()
 }
 
 type gombiScanner struct {
@@ -192,3 +189,14 @@ type gombiScanner struct {
 func newGombiScanner() gombiScanner {
 	return gombiScanner{scan.Scanner{Matcher: getMatcher()}}
 }
+
+//type gombiScanner struct {
+//	scan.GotoScanner
+//}
+//
+//func newGombiScanner() gombiScanner {
+//	return gombiScanner{scan.GotoScanner{
+//		Match:   match,
+//		EOF:     int(token.EOF),
+//		Illegal: int(token.ILLEGAL)}}
+//}

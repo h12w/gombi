@@ -46,7 +46,6 @@ var tokens = [...]elt{
 	//	{token.COMMENT, "// a comment \n", special},
 	//	{token.COMMENT, "/*\r*/", special},
 	{token.COMMENT, "//\r\n", special},
-
 	// Identifiers and basic type literals
 	{token.IDENT, "foobar", literal},
 	{token.IDENT, "a۰۱۸", literal},
@@ -84,7 +83,7 @@ var tokens = [...]elt{
 	{token.CHAR, "'\\U0000ff16'", literal},
 	{token.STRING, "`foobar`", literal},
 	{token.STRING, "`" + `foo
-									                        bar` +
+												                        bar` +
 		"`",
 		literal,
 	},
