@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/hailiang/gspec"
-	"github.com/hailiang/gspec/core"
 	"github.com/ogdl/flow"
 )
 
@@ -70,7 +69,7 @@ var testcases = []struct {
 	},
 }
 
-var _ = gspec.Add(func(s core.S) {
+var _ = gspec.Add(func(s gspec.S) {
 	testcase := s.Alias("testcase:")
 	expect := gspec.Expect(s.FailNow)
 	for i, tc := range testcases {
@@ -83,11 +82,11 @@ var _ = gspec.Add(func(s core.S) {
 })
 
 func TestAll(t *testing.T) {
-	suite.Test(t)
+	gspec.Test(t)
 }
 
 func init() {
-	ge.Sprint = flowPrint
+	gspec.SetSprint(flowPrint)
 }
 
 func flowPrint(v interface{}) string {

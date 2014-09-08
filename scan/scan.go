@@ -1,12 +1,13 @@
 package scan
 
 import (
-	"fmt"
+	"errors"
 	"io"
-	"strconv"
 
 	"github.com/hailiang/dfa"
 )
+
+var invalidInputErr = errors.New("invalid input")
 
 type Scanner struct {
 	*Matcher
@@ -66,19 +67,20 @@ func (s *Scanner) Scan() bool {
 	}
 	s.tok.ID = s.illegal
 	s.tok.Value = s.src[s.p : s.p+1] // advance 1 byte when illegal
-	s.err = invalidInputError(s.src[s.p:])
+	s.err = invalidInputErr
 	s.p++
 	return false
 }
-func invalidInputError(buf []byte) error {
-	return fmt.Errorf("token pattern does not match input from %s.", strconv.Quote(string(prefix(buf, 20))))
-}
-func prefix(buf []byte, i int) []byte {
-	if i <= len(buf) {
-		return buf[:i]
-	}
-	return buf
-}
+
+//func invalidInputError(buf []byte) error {
+//	return fmt.Errorf("token pattern does not match input from %s.", strconv.Quote(string(prefix(buf, 20))))
+//}
+//func prefix(buf []byte, i int) []byte {
+//	if i <= len(buf) {
+//		return buf[:i]
+//	}
+//	return buf
+//}
 
 func (s *Scanner) SetSource(src []byte) {
 	s.src = src

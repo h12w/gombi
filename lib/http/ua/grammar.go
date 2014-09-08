@@ -87,7 +87,7 @@ func newScanner() *switchScanner {
 			{commentText, tCommentText},
 		})
 
-		scanner = &switchScanner{scan.NewScanner(m), m, mc, 0}
+		scanner = &switchScanner{scan.Scanner{Matcher: m}, m, mc, 0}
 	)
 	return scanner
 }
@@ -105,7 +105,7 @@ func (s *switchScanner) parserToken() (*parse.Token, *parse.R) {
 }
 
 func (s *switchScanner) SetReader(r io.Reader) {
-	s.SetMatcher(s.m)
+	s.Matcher = s.m
 	s.Scanner.SetReader(r)
 }
 
@@ -115,12 +115,12 @@ func (s *switchScanner) Scan() bool {
 		case tLeftParen:
 			s.clevel++
 			if s.clevel > 0 {
-				s.SetMatcher(s.mc)
+				s.Matcher = s.mc
 			}
 		case tRightParen:
 			s.clevel--
 			if s.clevel == 0 {
-				s.SetMatcher(s.m)
+				s.Matcher = s.m
 			}
 		case tLWS, tCommentSep:
 			return s.Scan() // skip

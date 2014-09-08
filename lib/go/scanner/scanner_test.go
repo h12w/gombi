@@ -43,9 +43,10 @@ type elt struct {
 var tokens = [...]elt{
 	// Special tokens
 	{token.COMMENT, "/* a comment */", special},
-	//	{token.COMMENT, "// a comment \n", special},
-	//	{token.COMMENT, "/*\r*/", special},
+	{token.COMMENT, "// a comment \n", special},
+	{token.COMMENT, "/*\r*/", special},
 	{token.COMMENT, "//\r\n", special},
+
 	// Identifiers and basic type literals
 	{token.IDENT, "foobar", literal},
 	{token.IDENT, "a۰۱۸", literal},
@@ -83,12 +84,13 @@ var tokens = [...]elt{
 	{token.CHAR, "'\\U0000ff16'", literal},
 	{token.STRING, "`foobar`", literal},
 	{token.STRING, "`" + `foo
-												                        bar` +
+	                        bar` +
 		"`",
 		literal,
 	},
 	{token.STRING, "`\r`", literal},
 	{token.STRING, "`foo\r\nbar`", literal},
+
 	// Operators and delimiters
 	{token.ADD, "+", operator},
 	{token.SUB, "-", operator},

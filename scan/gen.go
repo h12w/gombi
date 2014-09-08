@@ -33,7 +33,7 @@ func (s *GotoScanner) Scan() bool {
 	}
 	s.tok.ID = s.Illegal
 	s.tok.Value = s.src[s.p : s.p+1] // advance 1 byte when illegal
-	s.err = invalidInputError(s.src[s.p:])
+	s.err = invalidInputErr
 	s.p++
 	return false
 }
