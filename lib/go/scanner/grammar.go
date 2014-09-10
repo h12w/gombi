@@ -9,7 +9,14 @@ import (
 )
 
 const (
+	tSemi       = int(token.SEMICOLON)
+	tComment    = int(token.COMMENT)
+	tString     = int(token.STRING)
+	tEOF        = int(token.EOF)
+	tIllegal    = int(token.ILLEGAL)
 	lastGoToken = int(token.VAR)
+	firstOp     = int(token.ADD)
+	lastOp      = int(token.COLON)
 )
 
 const (

@@ -12,6 +12,7 @@ import (
 var sampleGoFile = runtime.GOROOT() + "/src/pkg/go/scanner/scanner.go"
 
 func TestSingle(t *testing.T) {
+	//	fmt.Println(int(token.INT))
 }
 
 type sortItem struct {
