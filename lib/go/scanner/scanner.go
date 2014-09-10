@@ -2,11 +2,10 @@ package scanner
 
 import (
 	"fmt"
-	"go/token"
 	"path/filepath"
 	"unicode/utf8"
 
-	"github.com/hailiang/gombi/scan"
+	"go/token"
 )
 
 const (
@@ -27,14 +26,15 @@ type Scanner struct {
 	commentAfterPreSemi bool
 	endOfLinePos        int
 
-	commentQueue tokenQueue
-	endOfLine    int
-	tokBuf       scan.Token
+	endOfLine int
+
+	tokBuf tok
 
 	file *token.File  // source file handle
 	dir  string       // directory portion of file.Name()
 	err  ErrorHandler // error reporting; or nil
 	mode Mode         // scanning mode
+	src  []byte
 }
 
 func skipBOM(buf []byte) []byte {
@@ -53,7 +53,8 @@ func (s *Scanner) Init(file *token.File, src []byte, err ErrorHandler, mode Mode
 	}
 
 	s.gombiScanner = newGombiScanner()
-	s.SetSource(skipBOM(src))
+	s.src = skipBOM(src)
+	s.SetSource(s.src)
 
 	s.file = file
 	s.dir, _ = filepath.Split(file.Name())
@@ -66,129 +67,24 @@ func (s *Scanner) Init(file *token.File, src []byte, err ErrorHandler, mode Mode
 	s.commentAfterPreSemi = false
 	s.endOfLinePos = 0
 	s.endOfLine = 0
-	s.commentQueue.reset()
 }
 
 var newlineValue = []byte{'\n'}
 
-func (s *Scanner) insertSemi() *scan.Token {
-	if s.mode&dontInsertSemis == 0 &&
-		s.lastIsPreSemi {
-		s.tokBuf.ID = int(token.SEMICOLON)
-		s.tokBuf.Value = newlineValue
-		s.tokBuf.Pos = s.endOfLinePos
-		return &s.tokBuf
+func (s *Scanner) insertSemi() (t tok, ok bool) {
+	if s.mode&dontInsertSemis == 0 && s.lastIsPreSemi {
+		t.id = int(token.SEMICOLON)
+		t.val = newlineValue
+		t.pos = s.endOfLinePos
+		return t, true
 	}
-	return nil
+	return t, false
 }
 
-var skipToken = &scan.Token{ID: tSkip}
-
-func (s *Scanner) scanToken() *scan.Token {
-	if s.commentQueue.count() > 0 {
-		return s.commentQueue.pop()
-	}
-	s.gombiScanner.Scan()
-	t := s.Token()
-	// supress value for operations
-	if t.ID != int(token.SEMICOLON) && firstOp <= t.ID && t.ID <= lastOp {
-		t.Value = nil
-		return t
-	}
-	switch token.Token(t.ID) {
-	case tWhitespace: // skip whitespace
-		if s.lastIsPreSemi && !s.commentAfterPreSemi {
-			s.endOfLinePos = s.Pos() + 1
-		}
-		return skipToken
-	// add newline
-	case tNewline:
-		s.file.AddLine(t.Pos + 1)
-		if semi := s.insertSemi(); semi != nil {
-			return semi
-		}
-		return skipToken
-	case tLineComment:
-		s.addLineFromValue()
-		if s.lastIsPreSemi {
-			s.commentAfterPreSemi = true
-		}
-
-		// modify
-		t.ID = int(token.COMMENT)
-		if t.Value[len(t.Value)-1] == '\n' {
-			t.Value = t.Value[:len(t.Value)-1]
-		}
-		t.Value = stripCR(t.Value)
-
-		if semi := s.insertSemi(); semi != nil {
-			s.commentQueue.push(t)
-			return semi
-		}
-		if s.mode&ScanComments == 0 {
-			return skipToken
-		}
-	case tGeneralCommentML:
-		s.addLineFromValue()
-		if s.lastIsPreSemi {
-			s.commentAfterPreSemi = true
-		}
-		t.ID = int(token.COMMENT)
-		t.Value = stripCR(t.Value)
-		if semi := s.insertSemi(); semi != nil {
-			s.commentQueue.push(t)
-			return semi
-		}
-		if s.mode&ScanComments == 0 {
-			return skipToken
-		}
-	case tGeneralCommentSL:
-		if s.lastIsPreSemi {
-			s.commentAfterPreSemi = true
-		}
-		t.ID = int(token.COMMENT)
-		t.Value = stripCR(t.Value)
-		if semi := s.insertSemi(); semi != nil {
-			for {
-				s.commentQueue.push(t)
-				s.gombiScanner.Scan()
-				t = s.Token()
-				switch t.ID {
-				case int(token.EOF), tNewline, tLineComment, tGeneralCommentML:
-					s.commentQueue.push(t)
-					return semi
-				case tGeneralCommentSL:
-					s.commentQueue.push(t)
-				case tWhitespace:
-				default:
-					s.commentQueue.push(t)
-					return skipToken
-				}
-			}
-		}
-		if s.mode&ScanComments == 0 {
-			return skipToken
-		}
-	case tInterpretedStringLit:
-		t.ID = int(token.STRING)
-	case tRawStringLit:
-		s.addLineFromValue()
-		t.ID = int(token.STRING)
-		t.Value = stripCR(t.Value)
-	case token.EOF:
-		if semi := s.insertSemi(); semi != nil {
-			return semi
-		}
-		return t
-	}
-
-	return t
-}
-
-func (s *Scanner) addLineFromValue() (added bool) {
-	for i, c := range s.Token().Value {
+func (s *Scanner) addLineFromValue(pos int, val []byte) (added bool) {
+	for i, c := range val {
 		if c == '\n' {
-			s.file.AddLine(s.Token().Pos + i + 1)
+			s.file.AddLine(pos + i + 1)
 			added = true
 		}
 	}
@@ -207,24 +103,128 @@ func isPreSemi(tok int) bool {
 }
 
 func (s *Scanner) Scan() (token.Pos, token.Token, string) {
-	if s.Token() != nil && s.Token().ID == int(token.EOF) {
-		return s.file.Pos(s.Pos()), token.EOF, ""
-	}
-	var t *scan.Token
 	for {
-		t = s.scanToken()
-		if t.ID != tSkip {
-			break
+		var val []byte
+		s.gombiScanner.Scan()
+		t := s.Token()
+		// supress value for operations
+		if t.ID != int(token.SEMICOLON) && firstOp <= t.ID && t.ID <= lastOp {
+			goto Return
+		} else {
+			st := s.Token()
+			val = s.src[st.Lo:st.Hi]
 		}
-	}
-	if t.ID != int(token.ILLEGAL) {
-		s.endOfLinePos = s.Pos() + 1
-		s.lastIsPreSemi = isPreSemi(t.ID)
-		if s.lastIsPreSemi {
-			s.commentAfterPreSemi = false
+		switch t.ID {
+		case tWhitespace: // skip whitespace
+			if s.lastIsPreSemi && !s.commentAfterPreSemi {
+				s.endOfLinePos = s.Pos() + 1
+			}
+			continue
+		// add newline
+		case tNewline:
+			s.file.AddLine(t.Lo + 1)
+			if s.mode&dontInsertSemis == 0 && s.lastIsPreSemi {
+				t.ID = int(token.SEMICOLON)
+				t.Lo = s.endOfLinePos
+				val = newlineValue
+				goto Return
+			}
+			continue
+		case tLineComment:
+			if s.mode&dontInsertSemis == 0 && s.lastIsPreSemi {
+				s.SetPos(t.Lo)
+				t.ID = int(token.SEMICOLON)
+				t.Lo = s.endOfLinePos
+				val = newlineValue
+				goto Return
+			}
+			s.addLineFromValue(t.Lo, val)
+			if s.lastIsPreSemi {
+				s.commentAfterPreSemi = true
+			}
+
+			// modify
+			t.ID = int(token.COMMENT)
+			if val[len(val)-1] == '\n' {
+				val = val[:len(val)-1]
+			}
+			val = stripCR(val)
+
+			if s.mode&ScanComments == 0 {
+				continue
+			}
+		case tGeneralCommentML:
+			if s.mode&dontInsertSemis == 0 && s.lastIsPreSemi {
+				s.SetPos(t.Lo)
+				t.ID = int(token.SEMICOLON)
+				t.Lo = s.endOfLinePos
+				val = newlineValue
+				goto Return
+			}
+			s.addLineFromValue(t.Lo, val)
+			if s.lastIsPreSemi {
+				s.commentAfterPreSemi = true
+			}
+			t.ID = int(token.COMMENT)
+			val = stripCR(val)
+
+			if s.mode&ScanComments == 0 {
+				continue
+			}
+		case tGeneralCommentSL:
+			if s.lastIsPreSemi {
+				s.commentAfterPreSemi = true
+			}
+			t.ID = int(token.COMMENT)
+			val = stripCR(val)
+			oriPos := t.Lo
+			if s.mode&dontInsertSemis == 0 && s.lastIsPreSemi {
+				for {
+					s.gombiScanner.Scan()
+					t := s.Token()
+					val = s.src[t.Lo:t.Hi]
+					switch t.ID {
+					case int(token.EOF), tNewline, tLineComment, tGeneralCommentML:
+						s.SetPos(oriPos)
+						t.ID = int(token.SEMICOLON)
+						t.Lo = s.endOfLinePos
+						val = newlineValue
+						goto Return
+					case tGeneralCommentSL:
+					case tWhitespace:
+					default:
+						goto Return
+					}
+				}
+			}
+			if s.mode&ScanComments == 0 {
+				continue
+			}
+		case tInterpretedStringLit:
+			t.ID = int(token.STRING)
+		case tRawStringLit:
+			s.addLineFromValue(t.Lo, val)
+			t.ID = int(token.STRING)
+			val = stripCR(val)
+		case int(token.EOF):
+			if s.mode&dontInsertSemis == 0 && s.lastIsPreSemi {
+				t.ID = int(token.SEMICOLON)
+				t.Lo = s.endOfLinePos
+				val = newlineValue
+				goto Return
+			}
 		}
+	Return:
+
+		if t.ID != int(token.ILLEGAL) {
+			s.endOfLinePos = s.Pos() + 1
+			s.lastIsPreSemi = isPreSemi(t.ID)
+			if s.lastIsPreSemi {
+				s.commentAfterPreSemi = false
+			}
+		}
+		return s.file.Pos(t.Lo), token.Token(t.ID), string(val)
 	}
-	return s.file.Pos(t.Pos), token.Token(t.ID), string(t.Value)
 }
 
 type Mode uint
@@ -242,23 +242,8 @@ func stripCR(b []byte) []byte {
 	return b[:i]
 }
 
-type tokenQueue struct {
-	a []*scan.Token
-}
-
-func (q *tokenQueue) push(t *scan.Token) {
-	q.a = append(q.a, t)
-}
-
-func (q *tokenQueue) pop() (t *scan.Token) {
-	t, q.a = q.a[0], q.a[1:]
-	return t
-}
-
-func (q *tokenQueue) count() int {
-	return len(q.a)
-}
-
-func (q *tokenQueue) reset() {
-	q.a = q.a[0:0]
+type tok struct {
+	id  int
+	pos int
+	val []byte
 }

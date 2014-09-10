@@ -1,7 +1,6 @@
 package scan
 
-import "io"
-
+/*
 type GotoScanner struct {
 	Match        func(src []byte, pos int) (size, label int, matched bool)
 	EOF, Illegal int
@@ -59,3 +58,4 @@ func (s *GotoScanner) Error() error {
 	}
 	return s.err
 }
+*/

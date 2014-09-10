@@ -9,14 +9,18 @@ import (
 )
 
 const (
-	tNewline = 1000 + iota
+	lastGoToken = int(token.VAR)
+)
+
+const (
+	tNewline = (lastGoToken + 1) + iota
 	tWhitespace
 	tLineComment
 	tGeneralCommentSL
 	tGeneralCommentML
 	tRawStringLit
 	tInterpretedStringLit
-	tSkip
+	tokenCount
 )
 
 var globalMatcher *scan.Matcher
