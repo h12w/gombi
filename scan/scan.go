@@ -12,7 +12,6 @@ var invalidInputErr = errors.New("invalid input")
 type Scanner struct {
 	*Matcher
 
-	s   *dfa.FastS // current state
 	s0  *dfa.FastS // start state cache
 	src []byte     // source buffer
 	p   int        // position in source buffer
@@ -27,7 +26,6 @@ type Token struct {
 }
 
 func (s *Scanner) SetSource(src []byte) {
-	s.s = &s.fast.States[0]
 	s.s0 = &s.fast.States[0]
 	s.src = src
 	s.p = 0
@@ -42,7 +40,7 @@ func (s *Scanner) SetPos(p int) {
 func (s *Scanner) Scan() bool {
 	var (
 		pos        = s.p
-		cur        = s.s
+		cur        = s.s0
 		matchedPos = s.p
 		matched    bool
 	)
@@ -65,7 +63,6 @@ func (s *Scanner) Scan() bool {
 		s.tok.Lo = s.p
 		s.tok.Hi = matchedPos
 		s.p = matchedPos
-		s.s = s.s0
 		return true
 	} else if pos == len(s.src) {
 		s.tok.ID = s.eof
@@ -74,16 +71,12 @@ func (s *Scanner) Scan() bool {
 		s.err = io.EOF
 		return false
 	}
+	s.tok.ID = s.illegal
 	s.tok.Lo = s.p
 	s.tok.Hi = s.p + 1 // advance 1 byte when illegal
-	s.tok.ID = s.illegal
 	s.err = invalidInputErr
 	s.p++
 	return false
-}
-
-func (s *Scanner) Pos() int {
-	return s.p
 }
 
 func (s *Scanner) Token() *Token {

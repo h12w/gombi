@@ -61,7 +61,6 @@ func skipBOM(buf []byte) []byte {
 }
 
 func (s *Scanner) Scan() (token.Pos, token.Token, string) {
-	s.preSemi = false
 	for s.gombiScanner.Scan() {
 		var val []byte
 		t := s.Token()
@@ -70,33 +69,40 @@ func (s *Scanner) Scan() (token.Pos, token.Token, string) {
 			continue
 		case tNewline:
 			if s.preSemi && s.mode&dontInsertSemis == 0 {
-				t.ID, t.Lo, val = tSemi, s.endOfLine, newlineValue
+				t.ID, t.Lo, val, s.preSemi = tSemi, s.endOfLine, newlineValue, false
 				goto Return
 			}
 			s.file.AddLine(t.Lo + 1)
 			continue
+		case tIdent, tInt, tFloat, tImag, tChar, tString, tReturn, tBreak, tContinue, tFallthrough:
+			val = s.src[t.Lo:t.Hi]
+			s.preSemi, s.endOfLine = true, t.Hi
+		case tRParen, tRBrack, tRBrace, tInc, tDec:
+			s.preSemi, s.endOfLine = true, t.Hi
 		case tLineComment:
 			if s.preSemi && s.mode&dontInsertSemis == 0 {
 				s.SetPos(t.Lo)
-				t.ID, t.Lo, val = tSemi, s.endOfLine, newlineValue
+				t.ID, t.Lo, val, s.preSemi = tSemi, s.endOfLine, newlineValue, false
 				goto Return
 			}
-			val = s.src[t.Lo:t.Hi]
+			if s.mode&ScanComments == 0 {
+				continue
+			}
 			t.ID = tComment
+			val = s.src[t.Lo:t.Hi]
 			if val[len(val)-1] == '\n' {
 				s.file.AddLine(t.Hi)
 				val = val[:len(val)-1]
 			}
 			val = stripCR(val)
-
-			if s.mode&ScanComments == 0 {
-				continue
-			}
 		case tGeneralCommentML:
 			if s.preSemi && s.mode&dontInsertSemis == 0 {
 				s.SetPos(t.Lo)
-				t.ID, t.Lo, val = tSemi, s.endOfLine, newlineValue
+				t.ID, t.Lo, val, s.preSemi = tSemi, s.endOfLine, newlineValue, false
 				goto Return
+			}
+			if s.mode&ScanComments == 0 {
+				continue
 			}
 			t.ID = tComment
 			val = s.src[t.Lo:t.Hi]
@@ -106,37 +112,31 @@ func (s *Scanner) Scan() (token.Pos, token.Token, string) {
 				}
 			}
 			val = stripCR(val)
-
-			if s.mode&ScanComments == 0 {
-				continue
-			}
 		case tGeneralCommentSL:
-			t.ID = tComment
-			oriPos := t.Lo
 			if s.preSemi && s.mode&dontInsertSemis == 0 {
+				oriPos := t.Lo
 				for s.gombiScanner.Scan() {
 					t := s.Token()
 					switch t.ID {
 					case tEOF, tNewline, tLineComment, tGeneralCommentML:
 						s.SetPos(oriPos)
-						t.ID, t.Lo, val = tSemi, s.endOfLine, newlineValue
+						t.ID, t.Lo, val, s.preSemi = tSemi, s.endOfLine, newlineValue, false
 						goto Return
 					case tWhitespace, tGeneralCommentSL:
-					default:
-						val = s.src[t.Lo:t.Hi]
-						goto Return
+						continue
 					}
+					break
 				}
 			}
-			val = stripCR(s.src[t.Lo:t.Hi])
 			if s.mode&ScanComments == 0 {
 				continue
 			}
+			t.ID = tComment
+			val = stripCR(s.src[t.Lo:t.Hi])
 		case tInterpretedStringLit:
 			t.ID = tString
 			val = s.src[t.Lo:t.Hi]
-			s.preSemi = true
-			s.endOfLine = s.Pos() + 1
+			s.preSemi, s.endOfLine = true, t.Hi
 		case tRawStringLit:
 			t.ID = tString
 			val = s.src[t.Lo:t.Hi]
@@ -146,23 +146,15 @@ func (s *Scanner) Scan() (token.Pos, token.Token, string) {
 				}
 			}
 			val = stripCR(val)
-			s.preSemi = true
-			s.endOfLine = s.Pos() + 1
+			s.preSemi, s.endOfLine = true, t.Hi
 		case tEOF:
 			if s.preSemi && s.mode&dontInsertSemis == 0 {
-				t.ID, t.Lo, val = tSemi, s.endOfLine, newlineValue
+				s.SetPos(t.Lo)
+				t.ID, t.Lo, val, s.preSemi = tSemi, s.endOfLine, newlineValue, false
 				goto Return
 			}
 		case tIllegal:
 			goto Return
-		case tIdent, tInt, tFloat, tImag, tChar,
-			tString, tReturn, tBreak, tContinue, tFallthrough:
-			s.preSemi = true
-			s.endOfLine = s.Pos() + 1
-			val = s.src[t.Lo:t.Hi]
-		case tRParen, tRBrack, tRBrace, tInc, tDec:
-			s.preSemi = true
-			s.endOfLine = s.Pos() + 1
 		case tSemi:
 			val = s.src[t.Lo:t.Hi]
 		default:
@@ -170,7 +162,6 @@ func (s *Scanner) Scan() (token.Pos, token.Token, string) {
 				val = s.src[t.Lo:t.Hi]
 			}
 		}
-
 	Return:
 		return token.Pos(s.fileBase + t.Lo), token.Token(t.ID), string(val)
 	}
