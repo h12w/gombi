@@ -33,8 +33,6 @@ type Mode uint
 type ErrorHandler func(pos token.Position, msg string)
 
 func (s *Scanner) Init(file *token.File, src []byte, err ErrorHandler, mode Mode) {
-	//fmt.Println("Init src", strconv.Quote(string(src)), mode)
-
 	if file.Size() != len(src) {
 		panic(fmt.Sprintf("file size (%d) does not match src len (%d)", file.Size(), len(src)))
 	}
@@ -63,19 +61,17 @@ func skipBOM(buf []byte) []byte {
 }
 
 func (s *Scanner) Scan() (token.Pos, token.Token, string) {
+	s.preSemi = false
 	for s.gombiScanner.Scan() {
 		var val []byte
 		t := s.Token()
-		if firstOp <= t.ID && t.ID <= lastOp && t.ID != tSemi {
-			goto PreReturn
-		}
 		switch t.ID {
 		case tWhitespace:
 			continue
 		case tNewline:
 			if s.preSemi && s.mode&dontInsertSemis == 0 {
 				t.ID, t.Lo, val = tSemi, s.endOfLine, newlineValue
-				goto PreReturn
+				goto Return
 			}
 			s.file.AddLine(t.Lo + 1)
 			continue
@@ -83,7 +79,7 @@ func (s *Scanner) Scan() (token.Pos, token.Token, string) {
 			if s.preSemi && s.mode&dontInsertSemis == 0 {
 				s.SetPos(t.Lo)
 				t.ID, t.Lo, val = tSemi, s.endOfLine, newlineValue
-				goto PreReturn
+				goto Return
 			}
 			val = s.src[t.Lo:t.Hi]
 			t.ID = tComment
@@ -100,15 +96,15 @@ func (s *Scanner) Scan() (token.Pos, token.Token, string) {
 			if s.preSemi && s.mode&dontInsertSemis == 0 {
 				s.SetPos(t.Lo)
 				t.ID, t.Lo, val = tSemi, s.endOfLine, newlineValue
-				goto PreReturn
+				goto Return
 			}
+			t.ID = tComment
 			val = s.src[t.Lo:t.Hi]
 			for i, c := range val {
 				if c == '\n' {
 					s.file.AddLine(t.Lo + i + 1)
 				}
 			}
-			t.ID = tComment
 			val = stripCR(val)
 
 			if s.mode&ScanComments == 0 {
@@ -124,11 +120,11 @@ func (s *Scanner) Scan() (token.Pos, token.Token, string) {
 					case tEOF, tNewline, tLineComment, tGeneralCommentML:
 						s.SetPos(oriPos)
 						t.ID, t.Lo, val = tSemi, s.endOfLine, newlineValue
-						goto PreReturn
+						goto Return
 					case tWhitespace, tGeneralCommentSL:
 					default:
 						val = s.src[t.Lo:t.Hi]
-						goto PreReturn
+						goto Return
 					}
 				}
 			}
@@ -139,39 +135,43 @@ func (s *Scanner) Scan() (token.Pos, token.Token, string) {
 		case tInterpretedStringLit:
 			t.ID = tString
 			val = s.src[t.Lo:t.Hi]
+			s.preSemi = true
+			s.endOfLine = s.Pos() + 1
 		case tRawStringLit:
+			t.ID = tString
 			val = s.src[t.Lo:t.Hi]
 			for i, c := range val {
 				if c == '\n' {
 					s.file.AddLine(t.Lo + i + 1)
 				}
 			}
-			t.ID = tString
 			val = stripCR(val)
+			s.preSemi = true
+			s.endOfLine = s.Pos() + 1
 		case tEOF:
 			if s.preSemi && s.mode&dontInsertSemis == 0 {
 				t.ID, t.Lo, val = tSemi, s.endOfLine, newlineValue
-				goto PreReturn
+				goto Return
 			}
 		case tIllegal:
-			goto DirectReturn
-		default:
-			val = s.src[t.Lo:t.Hi]
-		}
-
-	PreReturn:
-		s.endOfLine = s.Pos() + 1
-		switch token.Token(t.ID) {
-		case token.IDENT, token.RPAREN, token.RBRACK, token.RBRACE,
-			token.INT, token.FLOAT, token.IMAG, token.CHAR, token.STRING,
-			token.RETURN, token.INC, token.DEC,
-			token.BREAK, token.CONTINUE, token.FALLTHROUGH:
+			goto Return
+		case tIdent, tInt, tFloat, tImag, tChar,
+			tString, tReturn, tBreak, tContinue, tFallthrough:
 			s.preSemi = true
+			s.endOfLine = s.Pos() + 1
+			val = s.src[t.Lo:t.Hi]
+		case tRParen, tRBrack, tRBrace, tInc, tDec:
+			s.preSemi = true
+			s.endOfLine = s.Pos() + 1
+		case tSemi:
+			val = s.src[t.Lo:t.Hi]
 		default:
-			s.preSemi = false
-
+			if t.ID < firstOp || t.ID > lastOp {
+				val = s.src[t.Lo:t.Hi]
+			}
 		}
-	DirectReturn:
+
+	Return:
 		return token.Pos(s.fileBase + t.Lo), token.Token(t.ID), string(val)
 	}
 	return token.Pos(s.fileBase + len(s.src)), token.EOF, ""
