@@ -69,14 +69,14 @@ func (s *Scanner) Scan() bool {
 		s.tok.Lo = s.p
 		s.tok.Hi = s.p
 		s.err = io.EOF
-		return false
+		return true
 	}
 	s.tok.ID = s.illegal
 	s.tok.Lo = s.p
 	s.tok.Hi = s.p + 1 // advance 1 byte when illegal
 	s.err = invalidInputErr
 	s.p++
-	return false
+	return true
 }
 
 func (s *Scanner) Token() *Token {
@@ -88,4 +88,9 @@ func (s *Scanner) Error() error {
 		return nil
 	}
 	return s.err
+}
+
+func (t *Token) Copy() *Token {
+	c := *t
+	return &c
 }

@@ -11,6 +11,7 @@ const (
 	tIdent       = int(token.IDENT)
 	tRParen      = int(token.RPAREN)
 	tRBrack      = int(token.RBRACK)
+	tLBrace      = int(token.LBRACE)
 	tRBrace      = int(token.RBRACE)
 	tInt         = int(token.INT)
 	tFloat       = int(token.FLOAT)

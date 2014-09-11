@@ -66,24 +66,25 @@ func (s *Scanner) Scan() (token.Pos, token.Token, string) {
 		t := s.Token()
 		switch t.ID {
 		case tWhitespace:
+			s.endOfLine = t.Hi + 1
 			continue
 		case tNewline:
 			if s.preSemi && s.mode&dontInsertSemis == 0 {
 				t.ID, t.Lo, val, s.preSemi = tSemi, s.endOfLine, newlineValue, false
-				goto Return
+				break
 			}
 			s.file.AddLine(t.Lo + 1)
 			continue
 		case tIdent, tInt, tFloat, tImag, tChar, tString, tReturn, tBreak, tContinue, tFallthrough:
+			s.preSemi, s.endOfLine = true, t.Hi+1
 			val = s.src[t.Lo:t.Hi]
-			s.preSemi, s.endOfLine = true, t.Hi
 		case tRParen, tRBrack, tRBrace, tInc, tDec:
-			s.preSemi, s.endOfLine = true, t.Hi
+			s.preSemi, s.endOfLine = true, t.Hi+1
 		case tLineComment:
 			if s.preSemi && s.mode&dontInsertSemis == 0 {
 				s.SetPos(t.Lo)
 				t.ID, t.Lo, val, s.preSemi = tSemi, s.endOfLine, newlineValue, false
-				goto Return
+				break
 			}
 			if s.mode&ScanComments == 0 {
 				continue
@@ -99,7 +100,7 @@ func (s *Scanner) Scan() (token.Pos, token.Token, string) {
 			if s.preSemi && s.mode&dontInsertSemis == 0 {
 				s.SetPos(t.Lo)
 				t.ID, t.Lo, val, s.preSemi = tSemi, s.endOfLine, newlineValue, false
-				goto Return
+				break
 			}
 			if s.mode&ScanComments == 0 {
 				continue
@@ -114,30 +115,37 @@ func (s *Scanner) Scan() (token.Pos, token.Token, string) {
 			val = stripCR(val)
 		case tGeneralCommentSL:
 			if s.preSemi && s.mode&dontInsertSemis == 0 {
-				oriPos := t.Lo
+				s.preSemi = false
+				t = t.Copy()
 				for s.gombiScanner.Scan() {
-					t := s.Token()
-					switch t.ID {
+					nt := s.Token()
+					switch nt.ID {
 					case tEOF, tNewline, tLineComment, tGeneralCommentML:
-						s.SetPos(oriPos)
-						t.ID, t.Lo, val, s.preSemi = tSemi, s.endOfLine, newlineValue, false
-						goto Return
+						s.SetPos(t.Lo)
+						t.ID, t.Lo, val = tSemi, s.endOfLine, newlineValue
+						goto returnSemi
 					case tWhitespace, tGeneralCommentSL:
 						continue
+					default:
+						s.SetPos(t.Hi)
+						goto returnComment
 					}
-					break
 				}
+			returnSemi:
+				break
 			}
+		returnComment:
 			if s.mode&ScanComments == 0 {
 				continue
 			}
 			t.ID = tComment
 			val = stripCR(s.src[t.Lo:t.Hi])
 		case tInterpretedStringLit:
+			s.preSemi, s.endOfLine = true, t.Hi+1
 			t.ID = tString
 			val = s.src[t.Lo:t.Hi]
-			s.preSemi, s.endOfLine = true, t.Hi
 		case tRawStringLit:
+			s.preSemi, s.endOfLine = true, t.Hi+1
 			t.ID = tString
 			val = s.src[t.Lo:t.Hi]
 			for i, c := range val {
@@ -146,23 +154,22 @@ func (s *Scanner) Scan() (token.Pos, token.Token, string) {
 				}
 			}
 			val = stripCR(val)
-			s.preSemi, s.endOfLine = true, t.Hi
 		case tEOF:
 			if s.preSemi && s.mode&dontInsertSemis == 0 {
 				s.SetPos(t.Lo)
 				t.ID, t.Lo, val, s.preSemi = tSemi, s.endOfLine, newlineValue, false
-				goto Return
 			}
-		case tIllegal:
-			goto Return
 		case tSemi:
+			s.preSemi = false
+			val = s.src[t.Lo:t.Hi]
+		case tIllegal:
 			val = s.src[t.Lo:t.Hi]
 		default:
+			s.preSemi = false
 			if t.ID < firstOp || t.ID > lastOp {
 				val = s.src[t.Lo:t.Hi]
 			}
 		}
-	Return:
 		return token.Pos(s.fileBase + t.Lo), token.Token(t.ID), string(val)
 	}
 	return token.Pos(s.fileBase + len(s.src)), token.EOF, ""
