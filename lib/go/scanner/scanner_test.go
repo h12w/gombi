@@ -459,7 +459,7 @@ var lines = []string{
 	"foo    $/*0*/ /*1*/ /*2*/    \n",
 	"foo	$/**/ /*-------------*/       /*----\n*/bar       $/*  \n*/baa$\n",
 	"foo    $/* an EOF terminates a line */",
-	"foo    $/* an EOF terminates a line */ /**/",
+	"foo    $/* an EOF terminates a line */ /*",
 	"foo    $/* an EOF terminates a line */ //",
 
 	"package main$\n\nfunc main() {\n\tif {\n\t\treturn /* */ }$\n}$\n",
@@ -728,7 +728,7 @@ var errors = []struct {
 	{`"` + "abc\ufeffdef" + `"`, token.STRING, 4, `"` + "abc\ufeffdef" + `"`, "illegal byte order mark"}, // only first BOM is ignored
 }
 
-func ATestScanErrors(t *testing.T) {
+func TestScanErrors(t *testing.T) {
 	for _, e := range errors {
 		checkError(t, e.src, e.tok, e.pos, e.lit, e.err)
 	}

@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"sort"
 	"testing"
+
+	"github.com/hailiang/gombi/scan"
 )
 
 var sampleGoFile = runtime.GOROOT() + "/src/pkg/go/scanner/scanner.go"
@@ -50,4 +52,25 @@ func ATestCount(t *testing.T) {
 	for _, item := range items {
 		fmt.Println(item.count, item.tok)
 	}
+}
+
+func ABenchmarkGrammar(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		spec()
+	}
+}
+
+func test() {
+	var (
+		c     = scan.Char
+		or    = scan.Or
+		class = scan.CharClass
+
+		unicodeLetter = class(`L`)
+		unicodeDigit  = class(`Nd`)
+		letter        = or(unicodeLetter, c(`_`))
+
+		ident = or(letter, unicodeDigit)
+	)
+	_ = ident
 }

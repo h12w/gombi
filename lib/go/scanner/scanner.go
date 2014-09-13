@@ -18,7 +18,8 @@ const (
 var newlineValue = []byte{'\n'}
 
 type Scanner struct {
-	gombiScanner
+	tokScanner scan.Scanner
+	errScanner scan.Scanner
 	ErrorCount int // number of errors encountered
 
 	preSemi   bool
@@ -39,9 +40,11 @@ func (s *Scanner) Init(file *token.File, src []byte, err ErrorHandler, mode Mode
 		panic(fmt.Sprintf("file size (%d) does not match src len (%d)", file.Size(), len(src)))
 	}
 
-	s.gombiScanner = newGombiScanner()
+	s.tokScanner = scan.Scanner{Matcher: getTokenMatcher()}
+	s.errScanner = scan.Scanner{Matcher: getErrorMatcher()}
 	s.src = skipBOM(src)
-	s.SetSource(s.src)
+	s.tokScanner.SetSource(s.src)
+	s.errScanner.SetSource(s.src)
 
 	s.file = file
 	s.fileBase = s.file.Base()
@@ -63,9 +66,10 @@ func skipBOM(buf []byte) []byte {
 }
 
 func (s *Scanner) Scan() (token.Pos, token.Token, string) {
-	for s.gombiScanner.Scan() {
+	for s.tokScanner.Scan() {
 		var val []byte
-		t := s.Token()
+		t := s.tokScanner.Token()
+		//fmt.Println(token.Token(t.ID), t, string(s.src[t.Lo:t.Hi]))
 		switch t.ID {
 		case tWhitespace:
 			s.endOfLine = t.Hi + 1
@@ -82,14 +86,18 @@ func (s *Scanner) Scan() (token.Pos, token.Token, string) {
 			val = s.src[t.Lo:t.Hi]
 		case tRightParen, tRightBrack, tRightBrace, tInc, tDec:
 			s.preSemi, s.endOfLine = true, t.Hi+1
-		case tLineComment:
+		case tLineComment, tLineCommentEOF:
 			if s.preSemi && s.mode&dontInsertSemis == 0 {
-				s.SetPos(t.Lo)
+				s.tokScanner.SetPos(t.Lo)
 				t.ID, t.Lo, val, s.preSemi = tSemiColon, s.endOfLine, newlineValue, false
 				break
 			}
 			if s.mode&ScanComments == 0 {
 				continue
+			}
+			if t.ID == tLineCommentEOF && t.Hi < len(s.src) {
+				t, val = s.handleError(t.Lo, t.Hi)
+				break
 			}
 			t.ID = tComment
 			val = s.src[t.Lo:t.Hi]
@@ -100,7 +108,7 @@ func (s *Scanner) Scan() (token.Pos, token.Token, string) {
 			val = stripCR(val)
 		case tGeneralCommentML:
 			if s.preSemi && s.mode&dontInsertSemis == 0 {
-				s.SetPos(t.Lo)
+				s.tokScanner.SetPos(t.Lo)
 				t.ID, t.Lo, val, s.preSemi = tSemiColon, s.endOfLine, newlineValue, false
 				break
 			}
@@ -119,17 +127,17 @@ func (s *Scanner) Scan() (token.Pos, token.Token, string) {
 			if s.preSemi && s.mode&dontInsertSemis == 0 {
 				s.preSemi = false
 				t = t.Copy()
-				for s.gombiScanner.Scan() {
-					nt := s.Token()
+				for s.tokScanner.Scan() {
+					nt := s.tokScanner.Token()
 					switch nt.ID {
 					case tWhitespace, tGeneralCommentSL:
 						continue
-					case tEOF, tNewline, tLineComment, tGeneralCommentML:
-						s.SetPos(t.Lo)
+					case tEOF, tNewline, tLineComment, tLineCommentEOF, tGeneralCommentML, eCommentIncomplete:
+						s.tokScanner.SetPos(t.Lo)
 						t.ID, t.Lo, val = tSemiColon, s.endOfLine, newlineValue
 						goto returnSemi
 					default:
-						s.SetPos(t.Hi)
+						s.tokScanner.SetPos(t.Hi)
 						goto returnComment
 					}
 				}
@@ -158,31 +166,31 @@ func (s *Scanner) Scan() (token.Pos, token.Token, string) {
 			val = stripCR(val)
 		case tEOF:
 			if s.preSemi && s.mode&dontInsertSemis == 0 {
-				s.SetPos(t.Lo)
+				s.tokScanner.SetPos(t.Lo)
 				t.ID, t.Lo, val, s.preSemi = tSemiColon, s.endOfLine, newlineValue, false
 			}
 		case tSemiColon:
 			s.preSemi = false
 			val = s.src[t.Lo:t.Hi]
-		case eRune:
+		case eCommentIncomplete:
+			if s.preSemi && s.mode&dontInsertSemis == 0 {
+				s.tokScanner.SetPos(t.Lo)
+				t.ID, t.Lo, val, s.preSemi = tSemiColon, s.endOfLine, newlineValue, false
+				break
+			}
+			t.ID = tComment
 			val = s.src[t.Lo:t.Hi]
-			t.ID = tRune
-			s.error(t, "illegal rune literal")
-		case eRuneEscapeChar:
-			r := decodeRune(s.src[t.Hi-2:])
+			s.error(t.Lo, "comment not terminated")
+		case eOctalLit:
+			t.ID = tInt
 			val = s.src[t.Lo:t.Hi]
-			t.ID = tRune
-			t.Lo = t.Hi - 1
-			s.error(t, fmt.Sprintf("illegal character %#U in escape sequence", r))
-		case eRuneUnknownEscape:
+			s.error(t.Lo, "illegal octal number")
+		case eHexLit:
+			t.ID = tInt
 			val = s.src[t.Lo:t.Hi]
-			t.ID = tRune
-			t.Lo += 2
-			s.error(t, "unknown escape sequence")
+			s.error(t.Lo, "illegal hexadecimal number")
 		case eIllegal:
-			r := decodeRune(s.src[t.Lo:])
-			val = s.src[t.Lo : t.Lo+1]
-			s.error(t, fmt.Sprintf("illegal character %#U", r))
+			t, val = s.handleError(t.Lo, t.Hi)
 		default:
 			s.preSemi = false
 			if t.ID < firstOp || t.ID > lastOp {
@@ -204,9 +212,72 @@ func stripCR(b []byte) []byte {
 	return b[:i]
 }
 
-func (s *Scanner) error(t *scan.Token, msg string) {
+func (s *Scanner) handleError(pos, errPos int) (t *scan.Token, val []byte) {
+	t = s.errScanner.Token()
+	s.errScanner.SetPos(pos)
+	s.errScanner.Scan()
+	//fmt.Println(t.ID, string(s.src[t.Lo:t.Hi]))
+	switch t.ID {
+	case eEscape:
+		r := decodeRune(s.src[errPos:])
+		t.ID = tRune
+		s.error(errPos, fmt.Sprintf("illegal character %#U in escape sequence", r))
+	case eEscapeUnknown:
+		t.ID = tRune
+		s.error(errPos, "unknown escape sequence")
+	case eIncompleteEscape:
+		t.ID = tRune
+		s.error(errPos, "escape sequence not terminated")
+	case eRuneIncomplete:
+		t.ID = tRune
+		s.error(pos, "rune literal not terminated")
+	case eRuneBOM:
+		t.ID = tRune
+		s.error(pos+1, "illegal byte order mark")
+	case eRune:
+		t.ID = tRune
+		s.error(pos, "illegal rune literal")
+	case eEscapeBigU:
+		t.ID = tRune
+		s.error(errPos-1, "escape sequence is invalid Unicode code point")
+	case eStrIncomplete:
+		t.ID = tString
+		s.error(pos, "string literal not terminated")
+	case eRawStrIncomplete:
+		t.ID = tString
+		s.error(pos, "raw string literal not terminated")
+	case eStrWithNUL:
+		t.ID = tString
+		s.error(errPos, "illegal character NUL")
+	case eStrWithBOM:
+		t.ID = tString
+		s.error(errPos-2, "illegal byte order mark")
+	case eStrWithWrongUTF8:
+		t.ID = tString
+		s.error(errPos, "illegal UTF-8 encoding")
+	case eCommentBOM:
+		t.ID = tComment
+		s.error(errPos, "illegal byte order mark")
+	default:
+		t.ID = eIllegal
+		r := decodeRune(s.src[pos:])
+		switch r {
+		case 0xFEFF:
+			t.Hi += len([]byte("\uFEFF"))
+			s.error(t.Hi, "illegal byte order mark")
+		default:
+			t.Hi = pos + 1
+			s.error(pos, fmt.Sprintf("illegal character %#U", r))
+		}
+	}
+	val = s.src[t.Lo:t.Hi]
+	s.tokScanner.SetPos(t.Hi)
+	return
+}
+
+func (s *Scanner) error(errPos int, msg string) {
 	if s.err != nil {
-		s.err(s.file.Position(token.Pos(s.fileBase+t.Lo)), msg)
+		s.err(s.file.Position(token.Pos(s.fileBase+errPos)), msg)
 	}
 }
 

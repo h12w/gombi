@@ -64,7 +64,7 @@ func (s *Scanner) Scan() bool {
 		s.tok.Hi = matchedPos
 		s.p = matchedPos
 		return true
-	} else if pos == len(s.src) {
+	} else if s.p == len(s.src) {
 		s.tok.ID = s.eof
 		s.tok.Lo = s.p
 		s.tok.Hi = s.p

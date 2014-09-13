@@ -99,6 +99,7 @@ const (
 	tNewline = (lastGoToken + 1) + iota
 	tWhitespace
 	tLineComment
+	tLineCommentEOF
 	tGeneralCommentSL
 	tGeneralCommentML
 	tRawStringLit
@@ -106,8 +107,23 @@ const (
 	// token end
 
 	// error start
-	eRune
-	eRuneEscapeChar
-	eRuneUnknownEscape
+	eRune //94
+	eRuneBOM
+	eEscape
+	eEscapeUnknown
+	eEscapeBigU
+	eRuneIncomplete
+	eIncompleteEscape
+	eStrIncomplete
+	eRawStrIncomplete
+	eCommentIncomplete
+	eOctalLit
+	eHexLit
+	eStrWithNUL
+	eStrWithBOM
+	eStrWithWrongUTF8
+	eCommentBOM
+	eErrorEOF
+	eErrorIllegal
 	// error end
 )
