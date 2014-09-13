@@ -39,10 +39,10 @@ func (s *Scanner) SetPos(p int) {
 
 func (s *Scanner) Scan() bool {
 	var (
-		pos        = s.p
-		cur        = s.s0
-		matchedPos = s.p
 		matched    bool
+		pos        = s.p
+		matchedPos = s.p
+		cur        = s.s0
 	)
 	for {
 		if cur.Label >= 0 {
@@ -73,9 +73,9 @@ func (s *Scanner) Scan() bool {
 	}
 	s.tok.ID = s.illegal
 	s.tok.Lo = s.p
-	s.tok.Hi = s.p + 1 // advance 1 byte when illegal
+	s.tok.Hi = pos // record the error position
 	s.err = invalidInputErr
-	s.p++
+	s.p++ // advance 1 byte when illegal
 	return true
 }
 

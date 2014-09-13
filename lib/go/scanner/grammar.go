@@ -1,25 +1,12 @@
 package scanner
 
 import (
-	"go/token"
+	"fmt"
 	"unicode/utf8"
 
 	"github.com/hailiang/dfa"
 	"github.com/hailiang/gombi/scan"
 )
-
-var globalMatcher *scan.Matcher
-
-func getMatcher() *scan.Matcher {
-	if globalMatcher == nil {
-		globalMatcher = scan.NewMatcher(
-			tEOF,
-			tIllegal,
-			tokenDefs(),
-		)
-	}
-	return globalMatcher
-}
 
 func tokenDefs() []scan.MID {
 	var (
@@ -41,21 +28,20 @@ func tokenDefs() []scan.MID {
 		octalDigit    = b('0', '7')
 		hexDigit      = or(b('0', '9'), b('A', 'F'), b('a', 'f'))
 
-		empty = s(``)
-
-		whitespaces = c(" \t\r").OneOrMore()
-		lineComment = con(s(`//`), unicodeChar.ZeroOrMore(), or(newline, empty))
 		// http://www.cs.dartmouth.edu/~mckeeman/cs118/assignments/comment.html
 		commentText = func(char *dfa.M) *dfa.M {
 			return con(char.Exclude(c(`*`)).ZeroOrMore(), s(`*`)).Loop(ifNot('/'))
 		}
-		generalCommentSL = con(s(`/*`), commentText(any.Exclude(s("\n"))), s(`/`))
-		generalCommentML = con(s(`/*`), commentText(any.Exclude(s("\n"))).ZeroOrOne(), s("\n"), commentText(any), s(`/`))
-		keywords         = or(s(`break`), s(`case`), s(`chan`), s(`const`),
+		keywords = or(s(`break`), s(`case`), s(`chan`), s(`const`),
 			s(`continue`), s(`default`), s(`defer`), s(`else`), s(`fallthrough`),
 			s(`for`), s(`func`), s(`go`), s(`goto`), s(`if`), s(`import`),
 			s(`interface`), s(`map`), s(`package`), s(`range`), s(`return`),
 			s(`select`), s(`struct`), s(`switch`), s(`type`), s(`var`))
+		empty                = s(``)
+		whitespaces          = c(" \t\r").OneOrMore()
+		lineComment          = con(s(`//`), unicodeChar.ZeroOrMore(), or(newline, empty))
+		generalCommentSL     = con(s(`/*`), commentText(any.Exclude(s("\n"))), s(`/`))
+		generalCommentML     = con(s(`/*`), commentText(any.Exclude(s("\n"))).ZeroOrOne(), s("\n"), commentText(any), s(`/`))
 		identifier           = con(letter, or(letter, unicodeDigit).ZeroOrMore()).Exclude(keywords)
 		hexLit               = con(s(`0`), c("xX"), hexDigit.OneOrMore())
 		decimalLit           = con(b('1', '9'), decimalDigit.ZeroOrMore())
@@ -75,96 +61,122 @@ func tokenDefs() []scan.MID {
 		bigUValue            = con(s(`\U`), hexDigit.Repeat(8))
 		escapedChar          = con(s(`\`), c(`abfnrtv\'"`))
 		unicodeValue         = or(unicodeChar.Exclude(c(`\`)), littleUValue, bigUValue, escapedChar)
-		runeLit              = con(s(`'`), or(byteValue, unicodeValue.Exclude(s(`'`))), s(`'`))
+		runeValue            = or(byteValue, unicodeValue.Exclude(s(`'`)))
+		runeLit              = con(s(`'`), runeValue, s(`'`))
 		rawStringLit         = con(s("`"), or(unicodeChar.Exclude(c("`")), newline).ZeroOrMore(), s("`"))
 		interpretedStringLit = con(s(`"`), or(unicodeValue.Exclude(s(`"`)), byteValue).ZeroOrMore(), s(`"`))
+
+		//		unknownEscape        = con(s(`\`), any.Exclude(octalDigit, c(`xUuabfnrtv\'"`)))
+		//		runeUnknownEscapeErr = con(s(`'`), unknownEscape.Exclude(s(`'`)), s(`'`))
+		//		runeEscapeCharErr    = con(s(`'`), con(s(`\`), any.Exclude(s(`'`)).OneOrMore()).Exclude(byteValue, littleUValue, bigUValue, escapedChar), s(`'`)).Exclude(runeUnknownEscapeErr)
+		//		runeErr              = or(
+		//			con(s(`'`), runeValue.Complement(), s(`'`)),
+		//			con(s(`'`), runeValue.AtLeast(2), s(`'`)),
+		//		).Exclude(runeEscapeCharErr, runeUnknownEscapeErr)
 	)
 	return []scan.MID{
 		{whitespaces, tWhitespace},
 		{s("\n"), tNewline},
-		{s(`if`), int(token.IF)},
-		{s(`break`), int(token.BREAK)},
-		{s(`case`), int(token.CASE)},
-		{s(`chan`), int(token.CHAN)},
-		{s(`const`), int(token.CONST)},
-		{s(`continue`), int(token.CONTINUE)},
-		{s(`default`), int(token.DEFAULT)},
-		{s(`defer`), int(token.DEFER)},
-		{s(`else`), int(token.ELSE)},
-		{s(`fallthrough`), int(token.FALLTHROUGH)},
-		{s(`for`), int(token.FOR)},
-		{s(`func`), int(token.FUNC)},
-		{s(`goto`), int(token.GOTO)},
-		{s(`go`), int(token.GO)},
-		{s(`import`), int(token.IMPORT)},
-		{s(`interface`), int(token.INTERFACE)},
-		{s(`map`), int(token.MAP)},
-		{s(`package`), int(token.PACKAGE)},
-		{s(`range`), int(token.RANGE)},
-		{s(`return`), int(token.RETURN)},
-		{s(`select`), int(token.SELECT)},
-		{s(`struct`), int(token.STRUCT)},
-		{s(`switch`), int(token.SWITCH)},
-		{s(`type`), int(token.TYPE)},
-		{s(`var`), int(token.VAR)},
-		{identifier, int(token.IDENT)},
 		{lineComment, tLineComment},
 		{generalCommentSL, tGeneralCommentSL},
 		{generalCommentML, tGeneralCommentML},
-		{runeLit, int(token.CHAR)},
-		{imaginaryLit, int(token.IMAG)},
-		{floatLit, int(token.FLOAT)},
-		{intLit, int(token.INT)},
+		{identifier, tIdentifier},
+		{intLit, tInt},
+		{floatLit, tFloat},
+		{imaginaryLit, tImag},
+		{runeLit, tRune},
 		{rawStringLit, tRawStringLit},
 		{interpretedStringLit, tInterpretedStringLit},
-		{s(`...`), int(token.ELLIPSIS)},
-		{s(`.`), int(token.PERIOD)},
-		{s(`(`), int(token.LPAREN)},
-		{s(`)`), int(token.RPAREN)},
-		{s(`{`), int(token.LBRACE)},
-		{s(`}`), int(token.RBRACE)},
-		{s(`,`), int(token.COMMA)},
-		{s(`==`), int(token.EQL)},
-		{s(`=`), int(token.ASSIGN)},
-		{s(`:=`), int(token.DEFINE)},
-		{s(`:`), int(token.COLON)},
-		{s(`[`), int(token.LBRACK)},
-		{s(`]`), int(token.RBRACK)},
-		{s(`*=`), int(token.MUL_ASSIGN)},
-		{s(`*`), int(token.MUL)},
-		{s(`+=`), int(token.ADD_ASSIGN)},
-		{s(`++`), int(token.INC)},
-		{s(`+`), int(token.ADD)},
-		{s(`-=`), int(token.SUB_ASSIGN)},
-		{s(`--`), int(token.DEC)},
-		{s(`-`), int(token.SUB)},
-		{s(`/=`), int(token.QUO_ASSIGN)},
-		{s(`/`), int(token.QUO)},
-		{s(`%=`), int(token.REM_ASSIGN)},
-		{s(`%`), int(token.REM)},
-		{s(`|=`), int(token.OR_ASSIGN)},
-		{s(`||`), int(token.LOR)},
-		{s(`|`), int(token.OR)},
-		{s(`^=`), int(token.XOR_ASSIGN)},
-		{s(`^`), int(token.XOR)},
-		{s(`<<=`), int(token.SHL_ASSIGN)},
-		{s(`<<`), int(token.SHL)},
-		{s(`>>=`), int(token.SHR_ASSIGN)},
-		{s(`>>`), int(token.SHR)},
-		{s(`&^=`), int(token.AND_NOT_ASSIGN)},
-		{s(`&^`), int(token.AND_NOT)},
-		{s(`&=`), int(token.AND_ASSIGN)},
-		{s(`&&`), int(token.LAND)},
-		{s(`&`), int(token.AND)},
-		{s(`!=`), int(token.NEQ)},
-		{s(`!`), int(token.NOT)},
-		{s(`<=`), int(token.LEQ)},
-		{s(`<-`), int(token.ARROW)},
-		{s(`<`), int(token.LSS)},
-		{s(`>=`), int(token.GEQ)},
-		{s(`>`), int(token.GTR)},
-		{s(`;`), int(token.SEMICOLON)},
+		{s(`+`), tAdd},
+		{s(`-`), tSub},
+		{s(`*`), tMul},
+		{s(`/`), tQuo},
+		{s(`%`), tRem},
+		{s(`&`), tAnd},
+		{s(`|`), tOr},
+		{s(`^`), tXor},
+		{s(`<<`), tShl},
+		{s(`>>`), tShr},
+		{s(`&^`), tAndNot},
+		{s(`+=`), tAddAssign},
+		{s(`-=`), tSubAssign},
+		{s(`*=`), tMulAssign},
+		{s(`/=`), tQuoAssign},
+		{s(`%=`), tRemAssign},
+		{s(`&=`), tAndAssign},
+		{s(`|=`), tOrAssign},
+		{s(`^=`), tXorAssign},
+		{s(`<<=`), tShlAssign},
+		{s(`>>=`), tShrAssign},
+		{s(`&^=`), tAndNotAssign},
+		{s(`&&`), tLogicAnd},
+		{s(`||`), tLogicOr},
+		{s(`<-`), tArrow},
+		{s(`++`), tInc},
+		{s(`--`), tDec},
+		{s(`==`), tEqual},
+		{s(`<`), tLess},
+		{s(`>`), tGreater},
+		{s(`=`), tAssign},
+		{s(`!`), tNot},
+		{s(`!=`), tNotEqual},
+		{s(`<=`), tLessEqual},
+		{s(`>=`), tGreaterEqual},
+		{s(`:=`), tDefine},
+		{s(`...`), tEllipsis},
+		{s(`(`), tLeftParen},
+		{s(`[`), tLeftBrack},
+		{s(`{`), tLeftBrace},
+		{s(`,`), tComma},
+		{s(`.`), tPeriod},
+		{s(`)`), tRightParen},
+		{s(`]`), tRightBrack},
+		{s(`}`), tRightBrace},
+		{s(`;`), tSemiColon},
+		{s(`:`), tColon},
+		{s(`break`), tBreak},
+		{s(`case`), tCase},
+		{s(`chan`), tChan},
+		{s(`const`), tConst},
+		{s(`continue`), tContinue},
+		{s(`default`), tDefault},
+		{s(`defer`), tDefer},
+		{s(`else`), tElse},
+		{s(`fallthrough`), tFallthrough},
+		{s(`for`), tFor},
+		{s(`func`), tFunc},
+		{s(`go`), tGo},
+		{s(`goto`), tGoto},
+		{s(`if`), tIf},
+		{s(`import`), tImport},
+		{s(`interface`), tInterface},
+		{s(`map`), tMap},
+		{s(`package`), tPackage},
+		{s(`range`), tRange},
+		{s(`return`), tReturn},
+		{s(`select`), tSelect},
+		{s(`struct`), tStruct},
+		{s(`switch`), tSwitch},
+		{s(`type`), tType},
+		{s(`var`), tVar},
+		//		{runeErr, eRune},
+		//		{runeEscapeCharErr, eRuneEscapeChar},
+		//		{runeUnknownEscapeErr, eRuneUnknownEscape},
 	}
+}
+
+var globalMatcher *scan.Matcher
+
+func getMatcher() *scan.Matcher {
+	if globalMatcher == nil {
+		globalMatcher = scan.NewMatcher(
+			tEOF,
+			eIllegal,
+			tokenDefs(),
+		)
+		fmt.Println(globalMatcher.Size())
+	}
+	return globalMatcher
 }
 
 func init() {

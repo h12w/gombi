@@ -6,6 +6,8 @@ import (
 	"unicode/utf8"
 
 	"go/token"
+
+	"github.com/hailiang/gombi/scan"
 )
 
 const (
@@ -70,20 +72,20 @@ func (s *Scanner) Scan() (token.Pos, token.Token, string) {
 			continue
 		case tNewline:
 			if s.preSemi && s.mode&dontInsertSemis == 0 {
-				t.ID, t.Lo, val, s.preSemi = tSemi, s.endOfLine, newlineValue, false
+				t.ID, t.Lo, val, s.preSemi = tSemiColon, s.endOfLine, newlineValue, false
 				break
 			}
 			s.file.AddLine(t.Lo + 1)
 			continue
-		case tIdent, tInt, tFloat, tImag, tChar, tString, tReturn, tBreak, tContinue, tFallthrough:
+		case tIdentifier, tInt, tFloat, tImag, tRune, tString, tReturn, tBreak, tContinue, tFallthrough:
 			s.preSemi, s.endOfLine = true, t.Hi+1
 			val = s.src[t.Lo:t.Hi]
-		case tRParen, tRBrack, tRBrace, tInc, tDec:
+		case tRightParen, tRightBrack, tRightBrace, tInc, tDec:
 			s.preSemi, s.endOfLine = true, t.Hi+1
 		case tLineComment:
 			if s.preSemi && s.mode&dontInsertSemis == 0 {
 				s.SetPos(t.Lo)
-				t.ID, t.Lo, val, s.preSemi = tSemi, s.endOfLine, newlineValue, false
+				t.ID, t.Lo, val, s.preSemi = tSemiColon, s.endOfLine, newlineValue, false
 				break
 			}
 			if s.mode&ScanComments == 0 {
@@ -99,7 +101,7 @@ func (s *Scanner) Scan() (token.Pos, token.Token, string) {
 		case tGeneralCommentML:
 			if s.preSemi && s.mode&dontInsertSemis == 0 {
 				s.SetPos(t.Lo)
-				t.ID, t.Lo, val, s.preSemi = tSemi, s.endOfLine, newlineValue, false
+				t.ID, t.Lo, val, s.preSemi = tSemiColon, s.endOfLine, newlineValue, false
 				break
 			}
 			if s.mode&ScanComments == 0 {
@@ -120,12 +122,12 @@ func (s *Scanner) Scan() (token.Pos, token.Token, string) {
 				for s.gombiScanner.Scan() {
 					nt := s.Token()
 					switch nt.ID {
-					case tEOF, tNewline, tLineComment, tGeneralCommentML:
-						s.SetPos(t.Lo)
-						t.ID, t.Lo, val = tSemi, s.endOfLine, newlineValue
-						goto returnSemi
 					case tWhitespace, tGeneralCommentSL:
 						continue
+					case tEOF, tNewline, tLineComment, tGeneralCommentML:
+						s.SetPos(t.Lo)
+						t.ID, t.Lo, val = tSemiColon, s.endOfLine, newlineValue
+						goto returnSemi
 					default:
 						s.SetPos(t.Hi)
 						goto returnComment
@@ -157,13 +159,30 @@ func (s *Scanner) Scan() (token.Pos, token.Token, string) {
 		case tEOF:
 			if s.preSemi && s.mode&dontInsertSemis == 0 {
 				s.SetPos(t.Lo)
-				t.ID, t.Lo, val, s.preSemi = tSemi, s.endOfLine, newlineValue, false
+				t.ID, t.Lo, val, s.preSemi = tSemiColon, s.endOfLine, newlineValue, false
 			}
-		case tSemi:
+		case tSemiColon:
 			s.preSemi = false
 			val = s.src[t.Lo:t.Hi]
-		case tIllegal:
+		case eRune:
 			val = s.src[t.Lo:t.Hi]
+			t.ID = tRune
+			s.error(t, "illegal rune literal")
+		case eRuneEscapeChar:
+			r := decodeRune(s.src[t.Hi-2:])
+			val = s.src[t.Lo:t.Hi]
+			t.ID = tRune
+			t.Lo = t.Hi - 1
+			s.error(t, fmt.Sprintf("illegal character %#U in escape sequence", r))
+		case eRuneUnknownEscape:
+			val = s.src[t.Lo:t.Hi]
+			t.ID = tRune
+			t.Lo += 2
+			s.error(t, "unknown escape sequence")
+		case eIllegal:
+			r := decodeRune(s.src[t.Lo:])
+			val = s.src[t.Lo : t.Lo+1]
+			s.error(t, fmt.Sprintf("illegal character %#U", r))
 		default:
 			s.preSemi = false
 			if t.ID < firstOp || t.ID > lastOp {
@@ -183,4 +202,18 @@ func stripCR(b []byte) []byte {
 		}
 	}
 	return b[:i]
+}
+
+func (s *Scanner) error(t *scan.Token, msg string) {
+	if s.err != nil {
+		s.err(s.file.Position(token.Pos(s.fileBase+t.Lo)), msg)
+	}
+}
+
+func decodeRune(bs []byte) rune {
+	r, _ := utf8.DecodeRune(bs)
+	if r == utf8.RuneError {
+		return rune(bs[0])
+	}
+	return r
 }
