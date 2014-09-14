@@ -65,13 +65,13 @@ func (s *Scanner) Scan() bool {
 		s.p = matchedPos
 		return true
 	} else if s.p == len(s.src) {
-		s.tok.ID = s.eof
+		s.tok.ID = s.EOF
 		s.tok.Lo = s.p
 		s.tok.Hi = s.p
 		s.err = io.EOF
 		return true
 	}
-	s.tok.ID = s.illegal
+	s.tok.ID = s.Illegal
 	s.tok.Lo = s.p
 	s.tok.Hi = pos // record the error position
 	s.err = invalidInputErr

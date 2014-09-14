@@ -1,25 +1,55 @@
 package scan
 
-import "github.com/hailiang/dfa"
+import (
+	"encoding/gob"
+	"os"
+
+	"github.com/hailiang/dfa"
+)
 
 type Matcher struct {
-	m       *dfa.M
-	fast    *dfa.FastM
-	eof     int
-	illegal int
+	*dfa.M
+	EOF     int
+	Illegal int
+
+	fast *dfa.FastM
 }
 type MID struct {
 	M  interface{}
 	ID int
 }
 
+func LoadMatcher(file string) (*Matcher, error) {
+	f, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	var m Matcher
+	err = gob.NewDecoder(f).Decode(&m)
+	if err != nil {
+		return nil, err
+	}
+	m.fast = m.M.ToFast()
+	return &m, nil
+}
+
+func (m *Matcher) SaveCache(file string) error {
+	f, err := os.Create(file)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return gob.NewEncoder(f).Encode(m)
+}
+
 func NewMatcher(eof, illegal int, mids []MID) *Matcher {
 	m := or(mids)
 	fast := m.ToFast()
 	return &Matcher{
-		eof:     eof,
-		illegal: illegal,
-		m:       m,
+		EOF:     eof,
+		Illegal: illegal,
+		M:       m,
 		fast:    fast}
 }
 
@@ -29,18 +59,6 @@ func (m *Matcher) Size() int {
 
 func (m *Matcher) Count() int {
 	return m.fast.Count()
-}
-
-func (m *Matcher) SaveSVG(file string) error {
-	return m.m.SaveSVG(file)
-}
-
-func (m *Matcher) SaveDot(file string) error {
-	return m.m.SaveDot(file)
-}
-
-func (m *Matcher) String() string {
-	return m.m.String()
 }
 
 func or(mids []MID) *dfa.M {

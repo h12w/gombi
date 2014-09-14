@@ -54,7 +54,7 @@ func ATestCount(t *testing.T) {
 	}
 }
 
-func ABenchmarkGrammar(b *testing.B) {
+func BenchmarkSpec(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		spec()
 	}

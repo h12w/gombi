@@ -1,14 +1,26 @@
 package scanner
 
 import (
-	"fmt"
 	"unicode/utf8"
 
 	"github.com/hailiang/dfa"
 	"github.com/hailiang/gombi/scan"
 )
 
-func spec() (tokens, errors []scan.MID) {
+const (
+	tokMatcherCache = "tok.cache"
+	errMatcherCache = "err.cache"
+	enableCache     = true
+)
+
+func spec() (tokMatcher, errMatcher *scan.Matcher) {
+	if enableCache {
+		tokMatcher, _ = scan.LoadMatcher(tokMatcherCache)
+		errMatcher, _ = scan.LoadMatcher(errMatcherCache)
+		if tokMatcher != nil && errMatcher != nil {
+			return
+		}
+	}
 	var (
 		c     = scan.Char
 		b     = scan.Between
@@ -108,7 +120,10 @@ func spec() (tokens, errors []scan.MID) {
 		strWithWrongUTF8Err  = con(`"`, or(anyByte.Exclude(`\`), or(byteValue, escapedChar, littleUValue, bigUValue).Optional()).Exclude(`"`).AtLeast(1), `"`).Exclude(strWithBOMErr)
 		lineCommentBOMErr    = con(`//`, or(unicodeChar.Optional(), BOM).AtLeast(1), or(newline, ""))
 	)
-	return []scan.MID{
+	tokMatcher, errMatcher = scan.NewMatcher(
+		tEOF,
+		eIllegal,
+		[]scan.MID{
 			{whitespaces, tWhitespace},
 			{"\n", tNewline},
 			{lineComment, tLineComment},
@@ -200,24 +215,30 @@ func spec() (tokens, errors []scan.MID) {
 			{commentIncompleteErr, eCommentIncomplete},
 			{octalLitErr, eOctalLit},
 			{hexLitErr, eHexLit},
-		},
-		[]scan.MID{
-			// error patterns that can be recognized by a second scan after an
-			// eIllegal error
-			{runeErr, eRune},
-			{runeBOMErr, eRuneBOM},
-			{runeEscapeErr, eEscape},
-			{runeEscapeBigUErr, eEscapeBigU},
-			{runeEscapeUnknownErr, eEscapeUnknown},
-			{runeIncompleteEscapeErr, eIncompleteEscape},
-			{runeIncompleteErr, eRuneIncomplete},
-			{strIncompleteErr, eStrIncomplete},
-			{rawStrIncompleteErr, eRawStrIncomplete},
-			{strWithNULErr, eStrWithNUL},
-			{strWithBOMErr, eStrWithBOM},
-			{strWithWrongUTF8Err, eStrWithWrongUTF8},
-			{lineCommentBOMErr, eCommentBOM},
-		}
+		}),
+		scan.NewMatcher(
+			eErrorEOF,
+			eErrorIllegal,
+			[]scan.MID{
+				// error patterns that can be recognized by a second scan after an
+				// eIllegal error
+				{runeErr, eRune},
+				{runeBOMErr, eRuneBOM},
+				{runeEscapeErr, eEscape},
+				{runeEscapeBigUErr, eEscapeBigU},
+				{runeEscapeUnknownErr, eEscapeUnknown},
+				{runeIncompleteEscapeErr, eIncompleteEscape},
+				{runeIncompleteErr, eRuneIncomplete},
+				{strIncompleteErr, eStrIncomplete},
+				{rawStrIncompleteErr, eRawStrIncomplete},
+				{strWithNULErr, eStrWithNUL},
+				{strWithBOMErr, eStrWithBOM},
+				{strWithWrongUTF8Err, eStrWithWrongUTF8},
+				{lineCommentBOMErr, eCommentBOM},
+			})
+	tokMatcher.SaveCache(tokMatcherCache)
+	errMatcher.SaveCache(errMatcherCache)
+	return
 }
 
 var (
@@ -226,20 +247,9 @@ var (
 )
 
 func initMatcher() {
-	tokenDefs, errorDefs := spec()
-	gTokenMatcher = scan.NewMatcher(
-		tEOF,
-		eIllegal,
-		tokenDefs,
-	)
-	gErrorMatcher = scan.NewMatcher(
-		eErrorEOF,
-		eErrorIllegal,
-		errorDefs,
-	)
-	fmt.Println(gTokenMatcher.Count())
-	fmt.Println(gErrorMatcher.Count())
-	//fmt.Println(gErrorMatcher)
+	gTokenMatcher, gErrorMatcher = spec()
+	//fmt.Println(gTokenMatcher.Count())
+	//fmt.Println(gErrorMatcher.Count())
 }
 
 func getTokenMatcher() *scan.Matcher {
@@ -254,8 +264,4 @@ func getErrorMatcher() *scan.Matcher {
 		initMatcher()
 	}
 	return gErrorMatcher
-}
-
-func init() {
-	getTokenMatcher()
 }
