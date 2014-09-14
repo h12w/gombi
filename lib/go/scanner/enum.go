@@ -100,6 +100,7 @@ const (
 	tWhitespace
 	tLineComment
 	tLineCommentEOF
+	tLineCommentInfo
 	tGeneralCommentSL
 	tGeneralCommentML
 	tRawStringLit
@@ -107,7 +108,7 @@ const (
 	// token end
 
 	// error start
-	eRune //94
+	eRune //95
 	eRuneBOM
 	eEscape
 	eEscapeUnknown

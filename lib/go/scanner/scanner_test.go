@@ -204,16 +204,16 @@ func newlineCount(s string) int {
 func checkPos(t *testing.T, lit string, p token.Pos, expected token.Position) {
 	pos := fset.Position(p)
 	if pos.Filename != expected.Filename {
-		t.Fatalf("bad filename for %q: got %s, expected %s", lit, pos.Filename, expected.Filename)
+		t.Errorf("bad filename for %q: got %s, expected %s", lit, pos.Filename, expected.Filename)
 	}
 	if pos.Offset != expected.Offset {
-		t.Fatalf("bad position for %q: got %d, expected %d", lit, pos.Offset, expected.Offset)
+		t.Errorf("bad position for %q: got %d, expected %d", lit, pos.Offset, expected.Offset)
 	}
 	if pos.Line != expected.Line {
-		t.Fatalf("bad line for %q: got %d, expected %d", lit, pos.Line, expected.Line)
+		t.Errorf("bad line for %q: got %d, expected %d", lit, pos.Line, expected.Line)
 	}
 	if pos.Column != expected.Column {
-		t.Fatalf("bad column for %q: got %d, expected %d", lit, pos.Column, expected.Column)
+		t.Errorf("bad column for %q: got %d, expected %d", lit, pos.Column, expected.Column)
 	}
 }
 
@@ -223,7 +223,7 @@ func TestScan(t *testing.T) {
 
 	// error handler
 	eh := func(_ token.Position, msg string) {
-		t.Fatalf("error handler called (msg = %s)", msg)
+		t.Errorf("error handler called (msg = %s)", msg)
 	}
 
 	// verify scan
@@ -257,12 +257,12 @@ func TestScan(t *testing.T) {
 			index++
 		}
 		if tok != e.tok {
-			t.Fatalf("bad token for %q: got %s, expected %s", lit, tok, e.tok)
+			t.Errorf("bad token for %q: got %s, expected %s", lit, tok, e.tok)
 		}
 
 		// check token class
 		if tokenclass(tok) != e.class {
-			t.Fatalf("bad class for %q: got %d, expected %d", lit, tokenclass(tok), e.class)
+			t.Errorf("bad class for %q: got %d, expected %d", lit, tokenclass(tok), e.class)
 		}
 
 		// check literal
@@ -291,7 +291,7 @@ func TestScan(t *testing.T) {
 			}
 		}
 		if lit != elit {
-			t.Fatalf("bad literal for %q: got %q, expected %q", lit, lit, elit)
+			t.Errorf("bad literal for %q: got %q, expected %q", lit, lit, elit)
 		}
 
 		if tok == token.EOF {
@@ -305,7 +305,7 @@ func TestScan(t *testing.T) {
 	}
 
 	if s.ErrorCount != 0 {
-		t.Fatalf("found %d errors", s.ErrorCount)
+		t.Errorf("found %d errors", s.ErrorCount)
 	}
 }
 
@@ -329,14 +329,14 @@ func checkSemi(t *testing.T, line string, mode Mode) {
 			pos, tok, lit = S.Scan()
 			if tok == token.SEMICOLON {
 				if lit != semiLit {
-					t.Fatalf(`bad literal for %q: got %q, expected %q`, line, lit, semiLit)
+					t.Errorf(`bad literal for %q: got %q, expected %q`, line, lit, semiLit)
 				}
 				checkPos(t, line, pos, semiPos)
 			} else {
-				t.Fatalf("bad token for %q: got %s, expected ;", line, tok)
+				t.Errorf("bad token for %q: got %s, expected ;", line, tok)
 			}
 		} else if tok == token.SEMICOLON {
-			t.Fatalf("bad token for %q: got ;, expected no ;", line)
+			t.Errorf("bad token for %q: got ;, expected no ;", line)
 		}
 		pos, tok, lit = S.Scan()
 	}
@@ -513,7 +513,7 @@ var winsegments = []segment{
 }
 
 // Verify that comments of the form "//line filename:line" are interpreted correctly.
-func ATestLineComments(t *testing.T) {
+func TestLineComments(t *testing.T) {
 	segs := segments
 	if runtime.GOOS == "windows" {
 		segs = append(segs, winsegments...)
@@ -543,7 +543,7 @@ func ATestLineComments(t *testing.T) {
 	}
 
 	if S.ErrorCount != 0 {
-		t.Fatalf("found %d errors", S.ErrorCount)
+		t.Errorf("found %d errors", S.ErrorCount)
 	}
 }
 
@@ -556,13 +556,13 @@ func TestInit(t *testing.T) {
 	f1 := fset.AddFile("src1", fset.Base(), len(src1))
 	s.Init(f1, []byte(src1), nil, dontInsertSemis)
 	if f1.Size() != len(src1) {
-		t.Fatalf("bad file size: got %d, expected %d", f1.Size(), len(src1))
+		t.Errorf("bad file size: got %d, expected %d", f1.Size(), len(src1))
 	}
 	s.Scan()              // if
 	s.Scan()              // true
 	_, tok, _ := s.Scan() // {
 	if tok != token.LBRACE {
-		t.Fatalf("bad token: got %s, expected %s", tok, token.LBRACE)
+		t.Errorf("bad token: got %s, expected %s", tok, token.LBRACE)
 	}
 
 	// 2nd init
@@ -570,19 +570,19 @@ func TestInit(t *testing.T) {
 	f2 := fset.AddFile("src2", fset.Base(), len(src2))
 	s.Init(f2, []byte(src2), nil, dontInsertSemis)
 	if f2.Size() != len(src2) {
-		t.Fatalf("bad file size: got %d, expected %d", f2.Size(), len(src2))
+		t.Errorf("bad file size: got %d, expected %d", f2.Size(), len(src2))
 	}
 	_, tok, _ = s.Scan() // go
 	if tok != token.GO {
-		t.Fatalf("bad token: got %s, expected %s", tok, token.GO)
+		t.Errorf("bad token: got %s, expected %s", tok, token.GO)
 	}
 
 	if s.ErrorCount != 0 {
-		t.Fatalf("found %d errors", s.ErrorCount)
+		t.Errorf("found %d errors", s.ErrorCount)
 	}
 }
 
-func ATestStdErrorHander(t *testing.T) {
+func TestStdErrorHander(t *testing.T) {
 	const src = "@\n" + // illegal character, cause an error
 		"@ @\n" + // two errors on the same line
 		"//line File2:20\n" +
@@ -604,23 +604,23 @@ func ATestStdErrorHander(t *testing.T) {
 	}
 
 	if len(list) != s.ErrorCount {
-		t.Fatalf("found %d errors, expected %d", len(list), s.ErrorCount)
+		t.Errorf("found %d errors, expected %d", len(list), s.ErrorCount)
 	}
 
 	if len(list) != 9 {
-		t.Fatalf("found %d raw errors, expected 9", len(list))
+		t.Errorf("found %d raw errors, expected 9", len(list))
 		PrintError(os.Stderr, list)
 	}
 
 	list.Sort()
 	if len(list) != 9 {
-		t.Fatalf("found %d sorted errors, expected 9", len(list))
+		t.Errorf("found %d sorted errors, expected 9", len(list))
 		PrintError(os.Stderr, list)
 	}
 
 	list.RemoveMultiples()
 	if len(list) != 4 {
-		t.Fatalf("found %d one-per-line errors, expected 4", len(list))
+		t.Errorf("found %d one-per-line errors, expected 4", len(list))
 		PrintError(os.Stderr, list)
 	}
 }
@@ -642,23 +642,23 @@ func checkError(t *testing.T, src string, tok token.Token, pos int, lit, err str
 	s.Init(fset.AddFile("", fset.Base(), len(src)), []byte(src), eh, ScanComments|dontInsertSemis)
 	_, tok0, lit0 := s.Scan()
 	if tok0 != tok {
-		t.Fatalf("%q: got %s, expected %s", src, tok0, tok)
+		t.Errorf("%q: got %s, expected %s", src, tok0, tok)
 	}
 	if tok0 != token.ILLEGAL && lit0 != lit {
-		t.Fatalf("%q: got literal %q, expected %q", src, lit0, lit)
+		t.Errorf("%q: got literal %q, expected %q", src, lit0, lit)
 	}
 	cnt := 0
 	if err != "" {
 		cnt = 1
 	}
 	if h.cnt != cnt {
-		t.Fatalf("%q: got cnt %d, expected %d", src, h.cnt, cnt)
+		t.Errorf("%q: got cnt %d, expected %d", src, h.cnt, cnt)
 	}
 	if h.msg != err {
-		t.Fatalf("%q: got msg %q, expected %q", src, h.msg, err)
+		t.Errorf("%q: got msg %q, expected %q", src, h.msg, err)
 	}
 	if h.pos.Offset != pos {
-		t.Fatalf("%q: got offset %d, expected %d", src, h.pos.Offset, pos)
+		t.Errorf("%q: got offset %d, expected %d", src, h.pos.Offset, pos)
 	}
 }
 

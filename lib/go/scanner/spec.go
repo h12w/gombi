@@ -21,9 +21,9 @@ func spec() (tokens, errors []scan.MID) {
 
 		NUL           = s("\x00")
 		BOM           = s("\uFEFF")
-		anyByte       = bb(0, 255).Exclude(NUL)
-		any           = b(0, utf8.MaxRune).Exclude(NUL, BOM)
-		newline       = c("\n")
+		anyByte       = bb(0x01, 0xff)
+		any           = b(1, utf8.MaxRune).Exclude(BOM)
+		newline       = s("\n")
 		unicodeChar   = any.Exclude(newline)
 		unicodeLetter = class(`L`)
 		unicodeDigit  = class(`Nd`)
@@ -41,12 +41,12 @@ func spec() (tokens, errors []scan.MID) {
 			`import`, `interface`, `map`, `package`, `range`, `return`, `select`,
 			`struct`, `switch`, `type`, `var`)
 		whitespaces          = c(" \t\r").AtLeast(1)
-		lineComment          = con(`//`, unicodeChar.Repeat(), newline)
+		lineCommentInfo      = con(`//line `, unicodeChar.AtLeast(1), newline)
+		lineComment          = con(`//`, unicodeChar.Repeat(), newline).Exclude(lineCommentInfo)
 		lineCommentEOF       = con(`//`, unicodeChar.Repeat())
 		generalCommentSL     = con(`/*`, commentText(any.Exclude("\n")), `/`)
 		generalCommentML     = con(`/*`, commentText(any.Exclude("\n")).Optional(), "\n", commentText(any), `/`)
-		ident                = con(letter, or(letter, unicodeDigit).Repeat())
-		identifier           = ident.Exclude(keywords)
+		identifier           = con(letter, or(letter, unicodeDigit).Repeat()).Exclude(keywords)
 		hexLit               = con(`0`, c("xX"), hexDigit.AtLeast(1))
 		decimalLit           = con(b('1', '9'), decimalDigit.Repeat())
 		octalLit             = con(`0`, octalDigit.Repeat())
@@ -113,6 +113,7 @@ func spec() (tokens, errors []scan.MID) {
 			{"\n", tNewline},
 			{lineComment, tLineComment},
 			{lineCommentEOF, tLineCommentEOF},
+			{lineCommentInfo, tLineCommentInfo},
 			{generalCommentSL, tGeneralCommentSL},
 			{generalCommentML, tGeneralCommentML},
 			{identifier, tIdentifier},
