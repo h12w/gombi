@@ -276,6 +276,7 @@ func (s *Scanner) handleError(pos, errPos int) (t *scan.Token, val []byte) {
 }
 
 func (s *Scanner) error(errPos int, msg string) {
+	s.ErrorCount++
 	if s.err != nil {
 		s.err(s.file.Position(token.Pos(s.fileBase+errPos)), msg)
 	}

@@ -9,7 +9,7 @@ type Matcher struct {
 	illegal int
 }
 type MID struct {
-	M  *dfa.M
+	M  interface{}
 	ID int
 }
 
@@ -44,10 +44,18 @@ func (m *Matcher) String() string {
 }
 
 func or(mids []MID) *dfa.M {
-	ms := make([]*dfa.M, len(mids))
+	ms := make([]interface{}, len(mids))
 	for i, mid := range mids {
-		mid.M.As(mid.ID)
-		ms[i] = mid.M
+		var m *dfa.M
+		switch o := mid.M.(type) {
+		case *dfa.M:
+			m = o
+		case string:
+			m = dfa.Str(o)
+		default:
+			panic("member M of MID should be type of either string or *M")
+		}
+		ms[i] = m.As(mid.ID)
 	}
 	return dfa.Or(ms...).Minimize()
 }

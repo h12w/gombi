@@ -34,83 +34,83 @@ func spec() (tokens, errors []scan.MID) {
 
 		// http://www.cs.dartmouth.edu/~mckeeman/cs118/assignments/comment.html
 		commentText = func(char *dfa.M) *dfa.M {
-			return con(char.Exclude(c(`*`)).ZeroOrMore(), s(`*`)).Loop(ifNot('/'))
+			return con(char.Exclude(c(`*`)).Repeat(), `*`).Loop(ifNot('/'))
 		}
-		keywords = or(s(`break`), s(`case`), s(`chan`), s(`const`),
-			s(`continue`), s(`default`), s(`defer`), s(`else`), s(`fallthrough`),
-			s(`for`), s(`func`), s(`go`), s(`goto`), s(`if`), s(`import`),
-			s(`interface`), s(`map`), s(`package`), s(`range`), s(`return`),
-			s(`select`), s(`struct`), s(`switch`), s(`type`), s(`var`))
-		empty                = s(``)
-		whitespaces          = c(" \t\r").OneOrMore()
-		lineComment          = con(s(`//`), unicodeChar.ZeroOrMore(), newline)
-		lineCommentEOF       = con(s(`//`), unicodeChar.ZeroOrMore())
-		generalCommentSL     = con(s(`/*`), commentText(any.Exclude(s("\n"))), s(`/`))
-		generalCommentML     = con(s(`/*`), commentText(any.Exclude(s("\n"))).ZeroOrOne(), s("\n"), commentText(any), s(`/`))
-		ident                = con(letter, or(letter, unicodeDigit).ZeroOrMore())
+		keywords = or(`break`, `case`, `chan`, `const`, `continue`, `default`,
+			`defer`, `else`, `fallthrough`, `for`, `func`, `go`, `goto`, `if`,
+			`import`, `interface`, `map`, `package`, `range`, `return`, `select`,
+			`struct`, `switch`, `type`, `var`)
+		whitespaces          = c(" \t\r").AtLeast(1)
+		lineComment          = con(`//`, unicodeChar.Repeat(), newline)
+		lineCommentEOF       = con(`//`, unicodeChar.Repeat())
+		generalCommentSL     = con(`/*`, commentText(any.Exclude("\n")), `/`)
+		generalCommentML     = con(`/*`, commentText(any.Exclude("\n")).Optional(), "\n", commentText(any), `/`)
+		ident                = con(letter, or(letter, unicodeDigit).Repeat())
 		identifier           = ident.Exclude(keywords)
-		hexLit               = con(s(`0`), c("xX"), hexDigit.OneOrMore())
-		decimalLit           = con(b('1', '9'), decimalDigit.ZeroOrMore())
-		octalLit             = con(s(`0`), octalDigit.ZeroOrMore())
+		hexLit               = con(`0`, c("xX"), hexDigit.AtLeast(1))
+		decimalLit           = con(b('1', '9'), decimalDigit.Repeat())
+		octalLit             = con(`0`, octalDigit.Repeat())
 		intLit               = or(hexLit, decimalLit, octalLit)
-		decimals             = decimalDigit.OneOrMore()
-		exponent             = con(c("eE"), c("+-").ZeroOrOne(), decimals)
-		floatLit1            = con(decimals, s(`.`), decimals.ZeroOrOne(), exponent.ZeroOrOne())
+		decimals             = decimalDigit.AtLeast(1)
+		exponent             = con(c("eE"), c("+-").Optional(), decimals)
+		floatLit1            = con(decimals, `.`, decimals.Optional(), exponent.Optional())
 		floatLit2            = con(decimals, exponent)
-		floatLit3            = con(s(`.`), decimals, exponent.ZeroOrOne())
+		floatLit3            = con(`.`, decimals, exponent.Optional())
 		floatLit             = or(floatLit1, floatLit2, floatLit3)
-		imaginaryLit         = con(or(floatLit, decimals), s(`i`))
-		hexByteValue         = con(s(`\x`), hexDigit.Repeat(2))
-		octalByteValue       = con(s(`\`), octalDigit.Repeat(3))
+		imaginaryLit         = con(or(floatLit, decimals), `i`)
+		hexByteValue         = con(`\x`, hexDigit.Repeat(2))
+		octalByteValue       = con(`\`, octalDigit.Repeat(3))
 		byteValue            = or(hexByteValue, octalByteValue)
-		littleUValue         = con(s(`\u`), hexDigit.Repeat(4))
-		bigUValue            = con(s(`\U00`), or(s(`10`), con(s(`0`), hexDigit)), hexDigit.Repeat(4))
-		escapedChar          = con(s(`\`), c(`abfnrtv\'"`))
-		unicodeValue         = or(unicodeChar.Exclude(c(`\`)), littleUValue, bigUValue, escapedChar)
-		runeValue            = or(byteValue, unicodeValue.Exclude(s(`'`)))
-		runeLit              = con(s(`'`), runeValue, s(`'`))
-		rawStrValue          = or(unicodeChar.Exclude(c("`")), newline)
-		rawStringLit         = con(s("`"), rawStrValue.ZeroOrMore(), s("`"))
-		strValue             = or(unicodeValue.Exclude(s(`"`)), byteValue)
-		interpretedStringLit = con(s(`"`), strValue.ZeroOrMore(), s(`"`))
+		littleUValue         = con(`\u`, hexDigit.Repeat(4))
+		bigUValue            = con(`\U00`, or(`10`, con(`0`, hexDigit)), hexDigit.Repeat(4))
+		escapedChar          = con(`\`, c(`abfnrtv\'"`))
+		unicodeValue         = or(unicodeChar.Exclude(`\`), littleUValue, bigUValue, escapedChar)
+		runeValue            = or(byteValue, unicodeValue.Exclude(`'`))
+		runeLit              = con(`'`, runeValue, `'`)
+		rawStrValue          = or(unicodeChar.Exclude("`"), newline)
+		rawStringLit         = con("`", rawStrValue.Repeat(), "`")
+		strValue             = or(unicodeValue.Exclude(`"`), byteValue)
+		interpretedStringLit = con(`"`, strValue.Repeat(), `"`)
 
 		// errors //
-		invalidBigU      = con(s(`\U`), hexDigit.Repeat(8)).Exclude(bigUValue)
-		unknownEscape    = con(s(`\`), any.Exclude(octalDigit, c(`xUuabfnrtv\'"`)))
-		incompleteEscape = con(s(`\`), or(
-			empty,
-			con(s(`x`), hexDigit.AtMost(1)),
-			con(s(`u`), hexDigit.AtMost(3)),
-			con(s(`U`), or(
-				s(`0`).AtMost(2),
-				s(`001`),
-				con(s(`0010`), hexDigit.AtMost(3)),
-				con(s(`000`), hexDigit.AtMost(4)),
+		invalidBigU      = con(`\U`, hexDigit.Repeat(8)).Exclude(bigUValue)
+		unknownEscape    = con(`\`, any.Exclude(octalDigit, c(`xUuabfnrtv\'"`)))
+		incompleteEscape = con(`\`, or(
+			"",
+			con(`x`, hexDigit.AtMost(1)),
+			con(`u`, hexDigit.AtMost(3)),
+			con(`U`, or(
+				``,
+				`0`,
+				`00`,
+				con(`000`, hexDigit.AtMost(4)),
+				`001`,
+				con(`0010`, hexDigit.AtMost(3)),
 			))))
-		runeEscapeBigUErr    = con(s(`'`), invalidBigU, s(`'`))
-		runeEscapeUnknownErr = con(s(`'`), unknownEscape, any.Exclude(s(`'`)).ZeroOrMore(), s(`'`))
-		runeBOMErr           = s("'\uFEFF'")
-		runeEscapeErr        = con(s(`'`), con(s(`\`), any.Exclude(s(`'`)).OneOrMore(), s(`'`))).Exclude(runeEscapeBigUErr, runeEscapeUnknownErr)
+		runeEscapeBigUErr    = con(`'`, invalidBigU, `'`)
+		runeEscapeUnknownErr = con(`'`, unknownEscape, any.Exclude(`'`).Repeat(), `'`)
+		runeBOMErr           = con(`'`, BOM, `'`)
+		runeEscapeErr        = con(`'`, con(`\`, any.Exclude(`'`).AtLeast(1), `'`)).Exclude(runeEscapeBigUErr, runeEscapeUnknownErr)
 		runeErr              = or(
-			con(s(`'`), runeValue.Complement(), s(`'`)),
-			con(s(`'`), runeValue.AtLeast(2), s(`'`)),
+			con(`'`, runeValue.Complement(), `'`),
+			con(`'`, runeValue.AtLeast(2), `'`),
 		).Exclude(runeEscapeErr, runeEscapeUnknownErr, runeEscapeBigUErr, runeBOMErr)
-		runeIncompleteEscapeErr = con(s(`'`), incompleteEscape)
-		runeIncompleteErr       = con(s(`'`), or(empty, unicodeChar.Exclude(c(`\'`))))
+		runeIncompleteEscapeErr = con(`'`, incompleteEscape)
+		runeIncompleteErr       = con(`'`, or("", unicodeChar.Exclude(`\`, `'`)))
 
-		strIncompleteErr     = con(s(`"`), strValue.ZeroOrMore())
-		rawStrIncompleteErr  = con(s("`"), rawStrValue.ZeroOrMore())
-		commentIncompleteErr = con(s(`/*`), or(any.Exclude(c(`*`)).ZeroOrMore(), s(`*`)).Loop(ifNot('/')))
-		octalLitErr          = con(s(`0`), octalDigit.ZeroOrMore(), c(`89`), decimalDigit.ZeroOrMore())
-		hexLitErr            = con(s(`0`), c(`xX`))
-		strWithNULErr        = con(s(`"`), strValue.ZeroOrMore(), NUL, or(NUL, strValue).ZeroOrMore(), s(`"`))
-		strWithBOMErr        = con(s(`"`), or(strValue.ZeroOrOne(), BOM).OneOrMore(), s(`"`))
-		strWithWrongUTF8Err  = con(s(`"`), or(anyByte.Exclude(s(`\`)), or(byteValue, escapedChar, littleUValue, bigUValue).ZeroOrOne()).Exclude(s(`"`)).OneOrMore(), s(`"`)).Exclude(strWithBOMErr)
-		lineCommentBOMErr    = con(s(`//`), or(unicodeChar.ZeroOrOne(), BOM).OneOrMore(), or(newline, empty))
+		strIncompleteErr     = con(`"`, strValue.Repeat())
+		rawStrIncompleteErr  = con("`", rawStrValue.Repeat())
+		commentIncompleteErr = con(`/*`, or(any.Exclude(`*`).Repeat(), `*`).Loop(ifNot('/')))
+		octalLitErr          = con(`0`, octalDigit.Repeat(), c(`89`), decimalDigit.Repeat())
+		hexLitErr            = con(`0`, c(`xX`))
+		strWithNULErr        = con(`"`, strValue.Repeat(), NUL, or(NUL, strValue).Repeat(), `"`)
+		strWithBOMErr        = con(`"`, or(strValue.Optional(), BOM).AtLeast(1), `"`)
+		strWithWrongUTF8Err  = con(`"`, or(anyByte.Exclude(`\`), or(byteValue, escapedChar, littleUValue, bigUValue).Optional()).Exclude(`"`).AtLeast(1), `"`).Exclude(strWithBOMErr)
+		lineCommentBOMErr    = con(`//`, or(unicodeChar.Optional(), BOM).AtLeast(1), or(newline, ""))
 	)
 	return []scan.MID{
 			{whitespaces, tWhitespace},
-			{s("\n"), tNewline},
+			{"\n", tNewline},
 			{lineComment, tLineComment},
 			{lineCommentEOF, tLineCommentEOF},
 			{generalCommentSL, tGeneralCommentSL},
@@ -122,78 +122,78 @@ func spec() (tokens, errors []scan.MID) {
 			{runeLit, tRune},
 			{rawStringLit, tRawStringLit},
 			{interpretedStringLit, tInterpretedStringLit},
-			{s(`+`), tAdd},
-			{s(`-`), tSub},
-			{s(`*`), tMul},
-			{s(`/`), tQuo},
-			{s(`%`), tRem},
-			{s(`&`), tAnd},
-			{s(`|`), tOr},
-			{s(`^`), tXor},
-			{s(`<<`), tShl},
-			{s(`>>`), tShr},
-			{s(`&^`), tAndNot},
-			{s(`+=`), tAddAssign},
-			{s(`-=`), tSubAssign},
-			{s(`*=`), tMulAssign},
-			{s(`/=`), tQuoAssign},
-			{s(`%=`), tRemAssign},
-			{s(`&=`), tAndAssign},
-			{s(`|=`), tOrAssign},
-			{s(`^=`), tXorAssign},
-			{s(`<<=`), tShlAssign},
-			{s(`>>=`), tShrAssign},
-			{s(`&^=`), tAndNotAssign},
-			{s(`&&`), tLogicAnd},
-			{s(`||`), tLogicOr},
-			{s(`<-`), tArrow},
-			{s(`++`), tInc},
-			{s(`--`), tDec},
-			{s(`==`), tEqual},
-			{s(`<`), tLess},
-			{s(`>`), tGreater},
-			{s(`=`), tAssign},
-			{s(`!`), tNot},
-			{s(`!=`), tNotEqual},
-			{s(`<=`), tLessEqual},
-			{s(`>=`), tGreaterEqual},
-			{s(`:=`), tDefine},
-			{s(`...`), tEllipsis},
-			{s(`(`), tLeftParen},
-			{s(`[`), tLeftBrack},
-			{s(`{`), tLeftBrace},
-			{s(`,`), tComma},
-			{s(`.`), tPeriod},
-			{s(`)`), tRightParen},
-			{s(`]`), tRightBrack},
-			{s(`}`), tRightBrace},
-			{s(`;`), tSemiColon},
-			{s(`:`), tColon},
-			{s(`break`), tBreak},
-			{s(`case`), tCase},
-			{s(`chan`), tChan},
-			{s(`const`), tConst},
-			{s(`continue`), tContinue},
-			{s(`default`), tDefault},
-			{s(`defer`), tDefer},
-			{s(`else`), tElse},
-			{s(`fallthrough`), tFallthrough},
-			{s(`for`), tFor},
-			{s(`func`), tFunc},
-			{s(`go`), tGo},
-			{s(`goto`), tGoto},
-			{s(`if`), tIf},
-			{s(`import`), tImport},
-			{s(`interface`), tInterface},
-			{s(`map`), tMap},
-			{s(`package`), tPackage},
-			{s(`range`), tRange},
-			{s(`return`), tReturn},
-			{s(`select`), tSelect},
-			{s(`struct`), tStruct},
-			{s(`switch`), tSwitch},
-			{s(`type`), tType},
-			{s(`var`), tVar},
+			{`+`, tAdd},
+			{`-`, tSub},
+			{`*`, tMul},
+			{`/`, tQuo},
+			{`%`, tRem},
+			{`&`, tAnd},
+			{`|`, tOr},
+			{`^`, tXor},
+			{`<<`, tShl},
+			{`>>`, tShr},
+			{`&^`, tAndNot},
+			{`+=`, tAddAssign},
+			{`-=`, tSubAssign},
+			{`*=`, tMulAssign},
+			{`/=`, tQuoAssign},
+			{`%=`, tRemAssign},
+			{`&=`, tAndAssign},
+			{`|=`, tOrAssign},
+			{`^=`, tXorAssign},
+			{`<<=`, tShlAssign},
+			{`>>=`, tShrAssign},
+			{`&^=`, tAndNotAssign},
+			{`&&`, tLogicAnd},
+			{`||`, tLogicOr},
+			{`<-`, tArrow},
+			{`++`, tInc},
+			{`--`, tDec},
+			{`==`, tEqual},
+			{`<`, tLess},
+			{`>`, tGreater},
+			{`=`, tAssign},
+			{`!`, tNot},
+			{`!=`, tNotEqual},
+			{`<=`, tLessEqual},
+			{`>=`, tGreaterEqual},
+			{`:=`, tDefine},
+			{`...`, tEllipsis},
+			{`(`, tLeftParen},
+			{`[`, tLeftBrack},
+			{`{`, tLeftBrace},
+			{`,`, tComma},
+			{`.`, tPeriod},
+			{`)`, tRightParen},
+			{`]`, tRightBrack},
+			{`}`, tRightBrace},
+			{`;`, tSemiColon},
+			{`:`, tColon},
+			{`break`, tBreak},
+			{`case`, tCase},
+			{`chan`, tChan},
+			{`const`, tConst},
+			{`continue`, tContinue},
+			{`default`, tDefault},
+			{`defer`, tDefer},
+			{`else`, tElse},
+			{`fallthrough`, tFallthrough},
+			{`for`, tFor},
+			{`func`, tFunc},
+			{`go`, tGo},
+			{`goto`, tGoto},
+			{`if`, tIf},
+			{`import`, tImport},
+			{`interface`, tInterface},
+			{`map`, tMap},
+			{`package`, tPackage},
+			{`range`, tRange},
+			{`return`, tReturn},
+			{`select`, tSelect},
+			{`struct`, tStruct},
+			{`switch`, tSwitch},
+			{`type`, tType},
+			{`var`, tVar},
 
 			// error patterns that have to be ORed with token patterns
 			{commentIncompleteErr, eCommentIncomplete},

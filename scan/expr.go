@@ -12,9 +12,7 @@ var (
 	Con         = dfa.Con
 	Or          = dfa.Or
 	And         = dfa.And
-	ZeroOrOne   = dfa.ZeroOrOne
-	ZeroOrMore  = dfa.ZeroOrMore
-	OneOrMore   = dfa.OneOrMore
+	Optional    = dfa.Optional
 	IfNot       = dfa.IfNot
 	CharClass   = dfa.CharClass
 )
