@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"fmt"
 	"unicode/utf8"
 
 	"github.com/hailiang/dfa"
@@ -10,7 +11,7 @@ import (
 const (
 	tokMatcherCache = "tok.cache"
 	errMatcherCache = "err.cache"
-	enableCache     = true
+	enableCache     = false
 )
 
 func spec() (tokMatcher, errMatcher *scan.Matcher) {
@@ -85,9 +86,9 @@ func spec() (tokMatcher, errMatcher *scan.Matcher) {
 		interpretedStringLit = con(`"`, strValue.Repeat(), `"`)
 
 		// errors //
-		invalidBigU      = con(`\U`, hexDigit.Repeat(8)).Exclude(bigUValue)
-		unknownEscape    = con(`\`, any.Exclude(octalDigit, c(`xUuabfnrtv\'"`)))
-		incompleteEscape = con(`\`, or(
+		invalidBigU       = con(`\U`, hexDigit.Repeat(8)).Exclude(bigUValue)
+		unknownRuneEscape = con(`\`, any.Exclude(octalDigit, c(`xUuabfnrtv\'`)))
+		incompleteEscape  = con(`\`, or(
 			"",
 			con(`x`, hexDigit.AtMost(1)),
 			con(`u`, hexDigit.AtMost(3)),
@@ -99,27 +100,30 @@ func spec() (tokMatcher, errMatcher *scan.Matcher) {
 				`001`,
 				con(`0010`, hexDigit.AtMost(3)),
 			))))
-		runeEscapeBigUErr    = con(`'`, invalidBigU, `'`)
-		runeEscapeUnknownErr = con(`'`, unknownEscape, any.Exclude(`'`).Repeat(), `'`)
-		runeBOMErr           = con(`'`, BOM, `'`)
-		runeEscapeErr        = con(`'`, con(`\`, any.Exclude(`'`).AtLeast(1), `'`)).Exclude(runeEscapeBigUErr, runeEscapeUnknownErr)
-		runeErr              = or(
-			con(`'`, runeValue.Complement(), `'`),
-			con(`'`, runeValue.AtLeast(2), `'`),
-		).Exclude(runeEscapeErr, runeEscapeUnknownErr, runeEscapeBigUErr, runeBOMErr)
-		runeIncompleteEscapeErr = con(`'`, incompleteEscape)
-		runeIncompleteErr       = con(`'`, or("", unicodeChar.Exclude(`\`, `'`)))
 
-		strIncompleteErr     = con(`"`, strValue.Repeat())
+		runeEscapeBigUErr    = con(`'`, invalidBigU, `'`)
+		runeEscapeUnknownErr = con(`'`, unknownRuneEscape, any.Exclude(`'`).Repeat(), `'`)
+		runeEscapeErr        = con(`'\`, any.Exclude(`'`).AtLeast(1), `'`).Exclude(runeEscapeBigUErr, runeEscapeUnknownErr)
+		runeBOMErr           = con(`'`, BOM, `'`)
+		runeErr              = or(
+			con(`'`, runeValue.Complement().Exclude(`'`), `'`),
+			con(`'`, runeValue.AtLeast(2), `'`),
+		).Exclude(runeEscapeBigUErr, runeEscapeUnknownErr, runeEscapeErr, runeBOMErr)
+		runeIncompleteEscapeErr = con(`'`, incompleteEscape)
+		runeIncompleteErr       = con(`'`, or(``, unicodeChar.Exclude(`\`, `'`)))
+
+		strIncompleteErr = con(`"`, strValue.Repeat())
+		strNULErr        = con(`"`, strValue.Repeat(), NUL, or(NUL, strValue).Repeat(), `"`)
+		strBOMErr        = con(`"`, or(strValue.Optional(), BOM).AtLeast(1), `"`)
+		strWrongUTF8Err  = con(`"`, or(anyByte.Exclude(`\`), or(byteValue, escapedChar, littleUValue, bigUValue).Optional()).Exclude(`"`).AtLeast(1), `"`).Exclude(strBOMErr)
+
 		rawStrIncompleteErr  = con("`", rawStrValue.Repeat())
 		commentIncompleteErr = con(`/*`, or(any.Exclude(`*`).Repeat(), `*`).Loop(ifNot('/')))
+		lineCommentBOMErr    = con(`//`, or(unicodeChar.Optional(), BOM).AtLeast(1), or(newline, ""))
 		octalLitErr          = con(`0`, octalDigit.Repeat(), c(`89`), decimalDigit.Repeat())
 		hexLitErr            = con(`0`, c(`xX`))
-		strWithNULErr        = con(`"`, strValue.Repeat(), NUL, or(NUL, strValue).Repeat(), `"`)
-		strWithBOMErr        = con(`"`, or(strValue.Optional(), BOM).AtLeast(1), `"`)
-		strWithWrongUTF8Err  = con(`"`, or(anyByte.Exclude(`\`), or(byteValue, escapedChar, littleUValue, bigUValue).Optional()).Exclude(`"`).AtLeast(1), `"`).Exclude(strWithBOMErr)
-		lineCommentBOMErr    = con(`//`, or(unicodeChar.Optional(), BOM).AtLeast(1), or(newline, ""))
 	)
+	//con(any.Exclude(BOM).Repeat(), BOM)
 	tokMatcher, errMatcher = scan.NewMatcher(
 		tEOF,
 		eIllegal,
@@ -231,13 +235,15 @@ func spec() (tokMatcher, errMatcher *scan.Matcher) {
 				{runeIncompleteErr, eRuneIncomplete},
 				{strIncompleteErr, eStrIncomplete},
 				{rawStrIncompleteErr, eRawStrIncomplete},
-				{strWithNULErr, eStrWithNUL},
-				{strWithBOMErr, eStrWithBOM},
-				{strWithWrongUTF8Err, eStrWithWrongUTF8},
+				{strNULErr, eStrWithNUL},
+				{strBOMErr, eStrWithBOM},
+				{strWrongUTF8Err, eStrWithWrongUTF8},
 				{lineCommentBOMErr, eCommentBOM},
 			})
-	tokMatcher.SaveCache(tokMatcherCache)
-	errMatcher.SaveCache(errMatcherCache)
+	if enableCache {
+		tokMatcher.SaveCache(tokMatcherCache)
+		errMatcher.SaveCache(errMatcherCache)
+	}
 	return
 }
 
@@ -248,8 +254,8 @@ var (
 
 func initMatcher() {
 	gTokenMatcher, gErrorMatcher = spec()
-	//fmt.Println(gTokenMatcher.Count())
-	//fmt.Println(gErrorMatcher.Count())
+	fmt.Println(gTokenMatcher.Count())
+	fmt.Println(gErrorMatcher.Count())
 }
 
 func getTokenMatcher() *scan.Matcher {

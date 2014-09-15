@@ -40,6 +40,7 @@ func (m *Matcher) SaveCache(file string) error {
 		return err
 	}
 	defer f.Close()
+	m.M = m.M.Minimize()
 	return gob.NewEncoder(f).Encode(m)
 }
 
@@ -75,7 +76,7 @@ func or(mids []MID) *dfa.M {
 		}
 		ms[i] = m.As(mid.ID)
 	}
-	return dfa.Or(ms...).Minimize()
+	return dfa.Or(ms...)
 }
 
 func GenGo(mids []MID, file, pac string) error {
