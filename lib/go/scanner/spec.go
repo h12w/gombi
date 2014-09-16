@@ -83,7 +83,8 @@ func spec() (tokMatcher, errMatcher *scan.Matcher) {
 		rawStrValue          = or(unicodeChar.Exclude("`"), newline)
 		rawStringLit         = con("`", rawStrValue.Repeat(), "`")
 		strValue             = or(unicodeValue.Exclude(`"`), byteValue)
-		interpretedStringLit = con(`"`, strValue.Repeat(), `"`)
+		strValues            = strValue.Repeat()
+		interpretedStringLit = con(`"`, strValues, `"`)
 
 		// errors //
 		invalidBigU       = con(`\U`, hexDigit.Repeat(8)).Exclude(bigUValue)
@@ -112,10 +113,12 @@ func spec() (tokMatcher, errMatcher *scan.Matcher) {
 		runeIncompleteEscapeErr = con(`'`, incompleteEscape)
 		runeIncompleteErr       = con(`'`, or(``, unicodeChar.Exclude(`\`, `'`)))
 
-		strIncompleteErr = con(`"`, strValue.Repeat())
-		strNULErr        = con(`"`, strValue.Repeat(), NUL, or(NUL, strValue).Repeat(), `"`)
-		strBOMErr        = con(`"`, or(strValue.Optional(), BOM).AtLeast(1), `"`)
-		strWrongUTF8Err  = con(`"`, or(anyByte.Exclude(`\`), or(byteValue, escapedChar, littleUValue, bigUValue).Optional()).Exclude(`"`).AtLeast(1), `"`).Exclude(strBOMErr)
+		anyStrValues     = bb(0, 0xFF).Exclude(`"`).Repeat()
+		strIncompleteErr = con(`"`, strValues)
+		strNULErr        = con(`"`, strValues, NUL, anyStrValues, `"`)
+		strBOMErr        = con(`"`, strValues, BOM, anyStrValues, `"`)
+		wrongUTF8        = bb(1, 0xff).Repeat(1, 4).Exclude(b(0, 0x10ffff)).Minimize()
+		strWrongUTF8Err  = con(`"`, strValues, wrongUTF8, anyStrValues, `"`).Exclude(strBOMErr)
 
 		rawStrIncompleteErr  = con("`", rawStrValue.Repeat())
 		commentIncompleteErr = con(`/*`, or(any.Exclude(`*`).Repeat(), `*`).Loop(ifNot('/')))
@@ -123,7 +126,9 @@ func spec() (tokMatcher, errMatcher *scan.Matcher) {
 		octalLitErr          = con(`0`, octalDigit.Repeat(), c(`89`), decimalDigit.Repeat())
 		hexLitErr            = con(`0`, c(`xX`))
 	)
-	//con(any.Exclude(BOM).Repeat(), BOM)
+	_ = anyByte
+	//wrongUTF8.SaveSVG("w.svg")
+	//sss.SaveSVG("sss.svg")
 	tokMatcher, errMatcher = scan.NewMatcher(
 		tEOF,
 		eIllegal,
