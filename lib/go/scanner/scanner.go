@@ -22,17 +22,19 @@ var newlineValue = []byte{'\n'}
 
 type Scanner struct {
 	tokScanner scan.Scanner
-	errScanner scan.Scanner
-	ErrorCount int // number of errors encountered
+	mode       Mode // scanning mode
+	src        []byte
 	preSemi    bool
 	semiPos    int
-	lineStart  int
-	file       *token.File // source file handle
-	fileBase   int
-	dir        string       // directory portion of file.Name()
+
+	file      *token.File // source file handle
+	fileBase  int         // cache of file.Base()
+	dir       string      // cache of the directory portion of file.Name()
+	lineStart int         // record the start position of each line
+
+	errScanner scan.Scanner
+	ErrorCount int          // number of errors encountered
 	err        ErrorHandler // error reporting; or nil
-	mode       Mode         // scanning mode
-	src        []byte
 }
 type Mode uint
 type ErrorHandler func(pos token.Position, msg string)
