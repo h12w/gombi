@@ -28,16 +28,16 @@ func spec() (tokMatcher, errMatcher *scan.Matcher) {
 		bb    = scan.BetweenByte
 		s     = scan.Str
 		con   = scan.Con
+		and   = scan.And
 		or    = scan.Or
 		ifNot = scan.IfNot
 		class = scan.CharClass
 
 		NUL           = s("\x00")
 		BOM           = s("\uFEFF")
-		anyByte       = bb(0x01, 0xff)
-		any           = b(1, utf8.MaxRune).Exclude(BOM)
+		valid         = b(1, utf8.MaxRune).Exclude(BOM)
 		newline       = s("\n")
-		unicodeChar   = any.Exclude(newline)
+		unicodeChar   = valid.Exclude(newline)
 		unicodeLetter = class(`L`)
 		unicodeDigit  = class(`Nd`)
 		letter        = or(unicodeLetter, c(`_`))
@@ -47,7 +47,9 @@ func spec() (tokMatcher, errMatcher *scan.Matcher) {
 
 		// http://www.cs.dartmouth.edu/~mckeeman/cs118/assignments/comment.html
 		commentText = func(char *dfa.M) *dfa.M {
-			return con(char.Exclude(c(`*`)).Repeat(), `*`).Loop(ifNot('/'))
+			return con(char.Exclude(`*`).Repeat(), `*`).Loop(ifNot('/'))
+			//stars := s(`*`).AtLeast(1)
+			//return con(or(char.Exclude(`*`), con(stars, char.Exclude(`/`))).Repeat(), stars)
 		}
 		keywords = or(`break`, `case`, `chan`, `const`, `continue`, `default`,
 			`defer`, `else`, `fallthrough`, `for`, `func`, `go`, `goto`, `if`,
@@ -57,8 +59,8 @@ func spec() (tokMatcher, errMatcher *scan.Matcher) {
 		lineCommentInfo      = con(`//line `, unicodeChar.AtLeast(1), newline)
 		lineComment          = con(`//`, unicodeChar.Repeat(), newline).Exclude(lineCommentInfo)
 		lineCommentEOF       = con(`//`, unicodeChar.Repeat())
-		generalCommentSL     = con(`/*`, commentText(any.Exclude("\n")), `/`)
-		generalCommentML     = con(`/*`, commentText(any.Exclude("\n")).Optional(), "\n", commentText(any), `/`)
+		generalCommentSL     = con(`/*`, commentText(valid.Exclude("\n")), `/`)
+		generalCommentML     = con(`/*`, commentText(valid.Exclude("\n")).Optional(), "\n", commentText(valid), `/`)
 		identifier           = con(letter, or(letter, unicodeDigit).Repeat()).Exclude(keywords)
 		hexLit               = con(`0`, c("xX"), hexDigit.AtLeast(1))
 		decimalLit           = con(b('1', '9'), decimalDigit.Repeat())
@@ -77,58 +79,56 @@ func spec() (tokMatcher, errMatcher *scan.Matcher) {
 		littleUValue         = con(`\u`, hexDigit.Repeat(4))
 		bigUValue            = con(`\U00`, or(`10`, con(`0`, hexDigit)), hexDigit.Repeat(4))
 		escapedChar          = con(`\`, c(`abfnrtv\'"`))
-		unicodeValue         = or(unicodeChar.Exclude(`\`), littleUValue, bigUValue, escapedChar)
-		runeValue            = or(byteValue, unicodeValue.Exclude(`'`))
+		escapedValue         = or(byteValue, littleUValue, bigUValue)
+		unicodeValue         = or(unicodeChar.Exclude(`\`), escapedValue, escapedChar)
+		runeValue            = unicodeValue.Exclude(`'`)
 		runeLit              = con(`'`, runeValue, `'`)
 		rawStrValue          = or(unicodeChar.Exclude("`"), newline)
+		rawStrValues         = rawStrValue.Repeat()
 		rawStringLit         = con("`", rawStrValue.Repeat(), "`")
-		strValue             = or(unicodeValue.Exclude(`"`), byteValue)
+		strValue             = unicodeValue.Exclude(`"`)
 		strValues            = strValue.Repeat()
 		interpretedStringLit = con(`"`, strValues, `"`)
 
 		// errors //
-		invalidBigU       = con(`\U`, hexDigit.Repeat(8)).Exclude(bigUValue)
-		unknownRuneEscape = con(`\`, any.Exclude(octalDigit, c(`xUuabfnrtv\'`)))
-		incompleteEscape  = con(`\`, or(
-			"",
-			con(`x`, hexDigit.AtMost(1)),
-			con(`u`, hexDigit.AtMost(3)),
-			con(`U`, or(
-				``,
-				`0`,
-				`00`,
-				con(`000`, hexDigit.AtMost(4)),
-				`001`,
-				con(`0010`, hexDigit.AtMost(3)),
-			))))
+		anyByte          = bb(0, 0xFF)
+		anyRuneValue     = anyByte.Exclude(`'`, "\n")
+		anyRuneValues    = anyByte.Exclude(`'`).Repeat()
+		anyStrValues     = anyByte.Exclude(`"`, "\n").Repeat()
+		anyRawStrValues  = anyByte.Exclude("`").Repeat()
+		anyEscapedValue  = con(`\`, or(octalDigit, c("uUx")), anyByte.Exclude(`'`, `"`, "\n").AtMost(8))
+		bigUNotInRange   = con(`\U`, hexDigit.Repeat(8)).Exclude(bigUValue)
+		invalidUTF8      = b(0, 0x10ffff).InvalidPrefix()
+		unknownEscape    = con(`\`, anyByte.Exclude(octalDigit, c(`xUuabfnrtv\'"`)))
+		invalidEscape    = and(escapedValue.InvalidPrefix(), anyEscapedValue)
+		incompleteEscape = and(escapedValue.Complement(), anyEscapedValue)
+		wrongEscape      = or(invalidEscape, incompleteEscape)
 
-		runeEscapeBigUErr    = con(`'`, invalidBigU, `'`)
-		runeEscapeUnknownErr = con(`'`, unknownRuneEscape, any.Exclude(`'`).Repeat(), `'`)
-		runeEscapeErr        = con(`'\`, any.Exclude(`'`).AtLeast(1), `'`).Exclude(runeEscapeBigUErr, runeEscapeUnknownErr)
-		runeBOMErr           = con(`'`, BOM, `'`)
-		runeErr              = or(
-			con(`'`, runeValue.Complement().Exclude(`'`), `'`),
-			con(`'`, runeValue.AtLeast(2), `'`),
-		).Exclude(runeEscapeBigUErr, runeEscapeUnknownErr, runeEscapeErr, runeBOMErr)
-		runeIncompleteEscapeErr = con(`'`, incompleteEscape)
-		runeIncompleteErr       = con(`'`, or(``, unicodeChar.Exclude(`\`, `'`)))
-
-		anyStrValues     = bb(0, 0xFF).Exclude(`"`).Repeat()
-		strIncompleteErr = con(`"`, strValues)
-		strNULErr        = con(`"`, strValues, NUL, anyStrValues, `"`)
-		strBOMErr        = con(`"`, strValues, BOM, anyStrValues, `"`)
-		wrongUTF8        = bb(1, 0xff).Repeat(1, 4).Exclude(b(0, 0x10ffff)).Minimize()
-		strWrongUTF8Err  = con(`"`, strValues, wrongUTF8, anyStrValues, `"`).Exclude(strBOMErr)
-
-		rawStrIncompleteErr  = con("`", rawStrValue.Repeat())
-		commentIncompleteErr = con(`/*`, or(any.Exclude(`*`).Repeat(), `*`).Loop(ifNot('/')))
-		lineCommentBOMErr    = con(`//`, or(unicodeChar.Optional(), BOM).AtLeast(1), or(newline, ""))
-		octalLitErr          = con(`0`, octalDigit.Repeat(), c(`89`), decimalDigit.Repeat())
-		hexLitErr            = con(`0`, c(`xX`))
+		BOMErr                  = BOM
+		BOMInRuneErr            = con(`'`, BOM, `'`)
+		BOMInStrErr             = con(`"`, strValues, BOM, anyStrValues, `"`)
+		BOMInRawStrErr          = con("`", rawStrValues, BOM, anyRawStrValues, "`")
+		BOMInLineCommentErr     = con(`//`, unicodeChar.Repeat(), BOM, anyByte.Exclude(newline).Repeat(), or(newline, ""))
+		NULErr                  = NUL
+		NULInStrErr             = con(`"`, strValues, NUL, anyStrValues, `"`)
+		bigURuneErr             = con(`'`, bigUNotInRange, `'`)
+		bigUStrErr              = con(`"`, strValues, bigUNotInRange, anyStrValues, `"`)
+		unknownEscapeInRuneErr  = con(`'`, unknownEscape, anyRuneValues, `'`)
+		unknownEscapeInStrErr   = con(`"`, strValues, unknownEscape, anyStrValues, `"`)
+		incompleteRuneEscapeErr = con(`'\`, anyRuneValues)
+		incompleteRuneErr       = con(`'`, anyRuneValue.Exclude(`\`).Repeat())
+		incompleteStrErr        = con(`"`, strValues)
+		incompleteRawStrErr     = con("`", rawStrValue.Repeat())
+		incompleteCommentErr    = con(`/*`, or(valid.Exclude(`*`).Repeat(), `*`).Loop(ifNot('/')))
+		UTF8Err                 = invalidUTF8
+		UTF8RuneErr             = con(`'`, invalidUTF8, `'`)
+		UTF8StrErr              = con(`"`, strValues, invalidUTF8, anyStrValues, `"`)
+		octalLitErr             = con(`0`, octalDigit.Repeat(), c(`89`), decimalDigit.Repeat())
+		hexLitErr               = con(`0`, c(`xX`))
+		strEscapeErr            = con(`"`, strValues, wrongEscape, anyStrValues, `"`).Exclude(bigUStrErr)
+		runeEscapeErr           = con(`'`, wrongEscape, `'`)
+		illegalRuneErr          = con(`'`, or(``, con(runeValue, anyRuneValue.AtLeast(1))), `'`)
 	)
-	_ = anyByte
-	//wrongUTF8.SaveSVG("w.svg")
-	//sss.SaveSVG("sss.svg")
 	tokMatcher, errMatcher = scan.NewMatcher(
 		tEOF,
 		eIllegal,
@@ -221,7 +221,7 @@ func spec() (tokMatcher, errMatcher *scan.Matcher) {
 			{`var`, tVar},
 
 			// error patterns that have to be ORed with token patterns
-			{commentIncompleteErr, eCommentIncomplete},
+			{incompleteCommentErr, eIncompleteComment},
 			{octalLitErr, eOctalLit},
 			{hexLitErr, eHexLit},
 		}),
@@ -231,19 +231,27 @@ func spec() (tokMatcher, errMatcher *scan.Matcher) {
 			[]scan.MID{
 				// error patterns that can be recognized by a second scan after an
 				// eIllegal error
-				{runeErr, eRune},
-				{runeBOMErr, eRuneBOM},
+				{BOMErr, eBOM},
+				{BOMInRuneErr, eBOMInRune},
+				{BOMInStrErr, eBOMInStr},
+				{BOMInRawStrErr, eBOMInStr},
+				{BOMInLineCommentErr, eBOMInComment},
+				{NULErr, eNUL},
+				{NULInStrErr, eNULInStr},
+				{illegalRuneErr, eRune},
 				{runeEscapeErr, eEscape},
-				{runeEscapeBigUErr, eEscapeBigU},
-				{runeEscapeUnknownErr, eEscapeUnknown},
-				{runeIncompleteEscapeErr, eIncompleteEscape},
-				{runeIncompleteErr, eRuneIncomplete},
-				{strIncompleteErr, eStrIncomplete},
-				{rawStrIncompleteErr, eRawStrIncomplete},
-				{strNULErr, eStrWithNUL},
-				{strBOMErr, eStrWithBOM},
-				{strWrongUTF8Err, eStrWithWrongUTF8},
-				{lineCommentBOMErr, eCommentBOM},
+				{strEscapeErr, eEscape},
+				{bigURuneErr, eBigU},
+				{bigUStrErr, eBigU},
+				{unknownEscapeInRuneErr, eEscapeUnknown},
+				{unknownEscapeInStrErr, eEscapeUnknown},
+				{incompleteRuneEscapeErr, eIncompleteEscape},
+				{incompleteRuneErr, eIncompleteRune},
+				{incompleteStrErr, eIncompleteStr},
+				{incompleteRawStrErr, eIncompleteRawStr},
+				{UTF8Err, eUTF8},
+				{UTF8RuneErr, eUTF8Rune},
+				{UTF8StrErr, eUTF8Str},
 			})
 	if enableCache {
 		tokMatcher.SaveCache(tokMatcherCache)

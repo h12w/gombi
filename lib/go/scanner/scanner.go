@@ -152,7 +152,7 @@ func (s *Scanner) Scan() (token.Pos, token.Token, string) {
 						case tWhitespace, tGeneralCommentSL:
 							continue
 						case tEOF, tNewline, tLineComment, tLineCommentEOF,
-							tLineCommentInfo, tGeneralCommentML, eCommentIncomplete:
+							tLineCommentInfo, tGeneralCommentML, eIncompleteComment:
 							s.tokScanner.SetPos(t.Lo)
 							t.ID, t.Lo, val = tSemiColon, s.semiPos, newlineValue
 							goto returnSemi
@@ -196,7 +196,7 @@ func (s *Scanner) Scan() (token.Pos, token.Token, string) {
 		case tSemiColon:
 			s.preSemi = false
 			val = s.src[t.Lo:t.Hi]
-		case eCommentIncomplete:
+		case eIncompleteComment:
 			if s.preSemi {
 				s.preSemi = false
 				if s.mode&dontInsertSemis == 0 {
@@ -259,63 +259,74 @@ func (s *Scanner) interpretLineComment(text []byte, pos int) {
 
 var commentInfoPrefix = []byte("//line ")
 
+const (
+	mBOM  = "illegal byte order mark"
+	mNUL  = "illegal character NUL"
+	mUTF8 = "illegal UTF-8 encoding"
+)
+
 func (s *Scanner) handleError(pos, errPos int) (t *scan.Token, val []byte) {
 	t = s.errScanner.Token()
 	s.errScanner.SetPos(pos)
 	s.errScanner.Scan()
 	//fmt.Println(t.ID, string(s.src[t.Lo:t.Hi]))
 	switch t.ID {
+	case eBOM:
+		t.ID = eIllegal
+		s.error(errPos+1, mBOM)
+	case eBOMInComment:
+		t.ID = tComment
+		s.error(errPos, mBOM)
+	case eBOMInRune:
+		t.ID = tRune
+		s.error(errPos-2, mBOM)
+	case eBOMInStr:
+		t.ID = tString
+		s.error(errPos-2, mBOM)
+	case eNUL:
+		t.ID = eIllegal
+		s.error(errPos+1, mBOM)
+	case eNULInStr:
+		t.ID = tString
+		s.error(errPos, mNUL)
+	case eUTF8:
+		t.ID = eIllegal
+		s.error(pos, mUTF8)
+	case eUTF8Rune:
+		t.ID = tRune
+		s.error(errPos, mUTF8)
+	case eUTF8Str:
+		t.ID = tString
+		s.error(errPos, mUTF8)
 	case eEscape:
 		r := decodeRune(s.src[errPos:])
 		t.ID = tRune
 		s.error(errPos, fmt.Sprintf("illegal character %#U in escape sequence", r))
+	case eBigU:
+		t.ID = tRune
+		s.error(errPos-1, "escape sequence is invalid Unicode code point")
 	case eEscapeUnknown:
 		t.ID = tRune
 		s.error(errPos, "unknown escape sequence")
+	case eIncompleteRune:
+		t.ID = tRune
+		s.error(pos, "rune literal not terminated")
 	case eIncompleteEscape:
 		t.ID = tRune
 		s.error(errPos, "escape sequence not terminated")
-	case eRuneIncomplete:
-		t.ID = tRune
-		s.error(pos, "rune literal not terminated")
-	case eRuneBOM:
-		t.ID = tRune
-		s.error(pos+1, "illegal byte order mark")
+	case eIncompleteStr:
+		t.ID = tString
+		s.error(pos, "string literal not terminated")
+	case eIncompleteRawStr:
+		t.ID = tString
+		s.error(pos, "raw string literal not terminated")
 	case eRune:
 		t.ID = tRune
 		s.error(pos, "illegal rune literal")
-	case eEscapeBigU:
-		t.ID = tRune
-		s.error(errPos-1, "escape sequence is invalid Unicode code point")
-	case eStrIncomplete:
-		t.ID = tString
-		s.error(pos, "string literal not terminated")
-	case eRawStrIncomplete:
-		t.ID = tString
-		s.error(pos, "raw string literal not terminated")
-	case eStrWithNUL:
-		t.ID = tString
-		s.error(errPos, "illegal character NUL")
-	case eStrWithBOM:
-		t.ID = tString
-		s.error(errPos-2, "illegal byte order mark")
-	case eStrWithWrongUTF8:
-		t.ID = tString
-		s.error(errPos, "illegal UTF-8 encoding")
-	case eCommentBOM:
-		t.ID = tComment
-		s.error(errPos, "illegal byte order mark")
 	default:
 		t.ID = eIllegal
-		r := decodeRune(s.src[pos:])
-		switch r {
-		case 0xFEFF:
-			t.Hi += len([]byte("\uFEFF"))
-			s.error(t.Hi, "illegal byte order mark")
-		default:
-			t.Hi = pos + 1
-			s.error(pos, fmt.Sprintf("illegal character %#U", r))
-		}
+		t.Hi = pos + 1
+		s.error(pos, fmt.Sprintf("illegal character %#U", decodeRune(s.src[pos:])))
 	}
 	val = s.src[t.Lo:t.Hi]
 	s.tokScanner.SetPos(t.Hi)

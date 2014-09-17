@@ -108,23 +108,32 @@ const (
 	// token end
 
 	// error start
-	eRune //95
-	eRuneBOM
-	eEscape
-	eEscapeUnknown
-	eEscapeBigU
-	eRuneIncomplete
-	eIncompleteEscape
-	eStrIncomplete
-	eRawStrIncomplete
-	eCommentIncomplete
-	eOctalLit
-	eHexLit
-	eStrWithNUL
-	eStrWithBOM
-	eStrWithWrongUTF8
-	eCommentBOM
-	eErrorEOF
+	// 95
 	eErrorIllegal
+	eErrorEOF
+	eBOM
+	eBOMInComment
+	eBOMInRune
+
+	// 100
+	eBOMInStr
+	eNUL
+	eNULInStr
+	eEscape
+	eBigU
+	eEscapeUnknown
+	eHexLit
+	eIncompleteComment
+	eIncompleteRune
+	eIncompleteEscape
+
+	// 110
+	eIncompleteStr
+	eIncompleteRawStr
+	eOctalLit
+	eRune
+	eUTF8
+	eUTF8Rune
+	eUTF8Str
 	// error end
 )
