@@ -42,12 +42,12 @@ func (m *Matcher) Count() int {
 	return m.fast.Count()
 }
 
-func (m *Matcher) WriteGo(w io.Writer) {
+func (m *Matcher) WriteGo(w io.Writer, pac string) {
 	fmt.Fprintln(w, "&scan.Matcher{")
 	fmt.Fprintf(w, "EOF: %d,\n", m.EOF)
 	fmt.Fprintf(w, "Illegal: %d,\n", m.Illegal)
 	fmt.Fprint(w, "M: ")
-	m.M.WriteGo(w)
+	m.M.WriteGo(w, pac)
 	fmt.Fprintln(w, "}")
 }
 

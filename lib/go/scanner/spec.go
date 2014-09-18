@@ -248,20 +248,18 @@ func spec() (tokMatcher, errMatcher *scan.Matcher) {
 				{UTF8RuneErr, eUTF8Rune},
 				{UTF8StrErr, eUTF8Str},
 			})
-	if !enableCache {
-		f, _ := os.Create("cache.go")
-		fmt.Fprint(f, `
+	f, _ := os.Create("cache.go")
+	fmt.Fprint(f, `
 package scanner
 import (
 	"github.com/hailiang/dfa"
 	"github.com/hailiang/gombi/scan"
 )
 `)
-		fmt.Fprintln(f, "var tokMatcherCache = ")
-		tokMatcher.WriteGo(f)
-		fmt.Fprintln(f, "var errMatcherCache = ")
-		errMatcher.WriteGo(f)
-	}
+	fmt.Fprintln(f, "var tokMatcherCache = ")
+	tokMatcher.WriteGo(f, "scanner")
+	fmt.Fprintln(f, "var errMatcherCache = ")
+	errMatcher.WriteGo(f, "scanner")
 	return
 }
 
@@ -272,8 +270,10 @@ var (
 
 func initMatcher() {
 	gTokenMatcher, gErrorMatcher = spec()
-	fmt.Println(gTokenMatcher.Count())
-	fmt.Println(gErrorMatcher.Count())
+	if !enableCache {
+		fmt.Println(gTokenMatcher.Count())
+		fmt.Println(gErrorMatcher.Count())
+	}
 }
 
 func getTokenMatcher() *scan.Matcher {
