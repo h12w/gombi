@@ -2,6 +2,7 @@ package scanner
 
 import (
 	"fmt"
+	"os"
 	"unicode/utf8"
 
 	"github.com/hailiang/dfa"
@@ -9,18 +10,12 @@ import (
 )
 
 const (
-	tokMatcherCache = "tok.cache"
-	errMatcherCache = "err.cache"
-	enableCache     = false
+	enableCache = false
 )
 
 func spec() (tokMatcher, errMatcher *scan.Matcher) {
 	if enableCache {
-		tokMatcher, _ = scan.LoadMatcher(tokMatcherCache)
-		errMatcher, _ = scan.LoadMatcher(errMatcherCache)
-		if tokMatcher != nil && errMatcher != nil {
-			return
-		}
+		return tokMatcherCache.Init(), errMatcherCache.Init()
 	}
 	var (
 		c     = scan.Char
@@ -253,9 +248,19 @@ func spec() (tokMatcher, errMatcher *scan.Matcher) {
 				{UTF8RuneErr, eUTF8Rune},
 				{UTF8StrErr, eUTF8Str},
 			})
-	if enableCache {
-		tokMatcher.SaveCache(tokMatcherCache)
-		errMatcher.SaveCache(errMatcherCache)
+	if !enableCache {
+		f, _ := os.Create("cache.go")
+		fmt.Fprint(f, `
+package scanner
+import (
+	"github.com/hailiang/dfa"
+	"github.com/hailiang/gombi/scan"
+)
+`)
+		fmt.Fprintln(f, "var tokMatcherCache = ")
+		tokMatcher.WriteGo(f)
+		fmt.Fprintln(f, "var errMatcherCache = ")
+		errMatcher.WriteGo(f)
 	}
 	return
 }

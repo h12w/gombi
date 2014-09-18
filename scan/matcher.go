@@ -1,8 +1,8 @@
 package scan
 
 import (
-	"encoding/gob"
-	"os"
+	"fmt"
+	"io"
 
 	"github.com/hailiang/dfa"
 )
@@ -19,31 +19,6 @@ type MID struct {
 	ID int
 }
 
-func LoadMatcher(file string) (*Matcher, error) {
-	f, err := os.Open(file)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	var m Matcher
-	err = gob.NewDecoder(f).Decode(&m)
-	if err != nil {
-		return nil, err
-	}
-	m.fast = m.M.ToFast()
-	return &m, nil
-}
-
-func (m *Matcher) SaveCache(file string) error {
-	f, err := os.Create(file)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	m.M = m.M.Minimize()
-	return gob.NewEncoder(f).Encode(m)
-}
-
 func NewMatcher(eof, illegal int, mids []MID) *Matcher {
 	m := or(mids)
 	fast := m.ToFast()
@@ -54,12 +29,26 @@ func NewMatcher(eof, illegal int, mids []MID) *Matcher {
 		fast:    fast}
 }
 
+func (m *Matcher) Init() *Matcher {
+	m.fast = m.M.ToFast()
+	return m
+}
+
 func (m *Matcher) Size() int {
 	return m.fast.Size()
 }
 
 func (m *Matcher) Count() int {
 	return m.fast.Count()
+}
+
+func (m *Matcher) WriteGo(w io.Writer) {
+	fmt.Fprintln(w, "&scan.Matcher{")
+	fmt.Fprintf(w, "EOF: %d,\n", m.EOF)
+	fmt.Fprintf(w, "Illegal: %d,\n", m.Illegal)
+	fmt.Fprint(w, "M: ")
+	m.M.WriteGo(w)
+	fmt.Fprintln(w, "}")
 }
 
 func or(mids []MID) *dfa.M {
@@ -78,15 +67,3 @@ func or(mids []MID) *dfa.M {
 	}
 	return dfa.Or(ms...)
 }
-
-func GenGo(mids []MID, file, pac string) error {
-	return or(mids).SaveGo(file, pac)
-}
-
-//func (m *Matcher) SaveSVG(file string) error {
-//	return m.m.SaveSVG(file)
-//}
-//
-//func (m *Matcher) SaveDot(file string) error {
-//	return m.m.SaveDot(file)
-//}
