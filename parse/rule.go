@@ -28,40 +28,78 @@ type (
 		*R
 		Rules
 	}
-	Rules []*R
-	Alts  []*Alt
+	Rules   []*R
+	Alts    []*Alt
+	Builder struct {
+		terms map[string]*R
+	}
 )
 
 var (
-	EOF  = Term("EOF")
-	Null = Term("Null")
-	self = Term("")
+	EOF  = NewRule().As("EOF")
+	Null = NewRule().As("Null")
+	Self = NewRule()
 )
 
-func newR() *R {
-	return &R{}
+func NewBuilder() *Builder {
+	return &Builder{terms: make(map[string]*R)}
 }
 
-func Term(name string) *R {
-	r := newR()
+func NewRule() *R {
+	r := &R{}
 	r.Alts = Alts{{R: r, Rules: Rules{nil}}}
-	return r.As(name)
+	return r
+}
+
+func (b *Builder) Term(name string) *R {
+	if r, ok := b.terms[name]; ok {
+		return r
+	}
+	r := NewRule()
+	r.Alts = Alts{{R: r, Rules: Rules{nil}}}
+	r = r.As(name)
+	b.terms[name] = r
+	return r
+}
+
+//func Self(name string) *R {
+//	self.name = name
+//	return self
+//}
+
+func (b *Builder) toRules(a []interface{}) []*R {
+	rs := make([]*R, len(a))
+	for i := range rs {
+		switch o := a[i].(type) {
+		case *R:
+			rs[i] = o
+		case string:
+			rs[i] = b.Term(o)
+		default:
+			panic("type of argument should be either string or *R")
+		}
+	}
+	return rs
 }
 
 func (r *R) isTerm() bool {
 	return len(r.Alts) == 1 && len(r.Alts[0].Rules) == 1 && r.Alts[0].Rules[0] == nil
 }
 
-func Rule(name string, rules ...*R) *R {
-	r := Con(rules...)
+func (b *Builder) Recur(rules ...interface{}) *R {
+	r := b.Con(rules...)
 	if r.name != "" {
 		r = r.wrap()
 	}
 	r.initRecursiveRule(make(map[*R]bool), r)
-	return r.As(name)
+	return r
+}
+
+func (b *Builder) Rule(name string, rules ...interface{}) *R {
+	return b.Recur(rules...).As(name)
 }
 func (r *R) wrap() *R {
-	nr := newR()
+	nr := NewRule()
 	nr.Alts = Alts{{R: nr, Rules: Rules{r}}}
 	return nr
 }
@@ -75,11 +113,11 @@ func (r *R) initRecursiveRule(m map[*R]bool, selfValue *R) {
 	}
 	m[r] = true
 	for _, alt := range r.Alts {
-		if alt.R == self {
+		if alt.R == Self {
 			alt.R = selfValue
 		}
 		for i, cr := range alt.Rules {
-			if cr == self {
+			if cr == Self {
 				alt.Rules[i] = selfValue
 			} else {
 				cr.initRecursiveRule(m, selfValue)
@@ -88,25 +126,32 @@ func (r *R) initRecursiveRule(m map[*R]bool, selfValue *R) {
 	}
 }
 
-func Self(name string) *R {
-	self.name = name
-	return self
+func (r *R) Define(o *R) *R {
+	r.Alts = o.Alts
+	return r
 }
 
-func Con(rules ...*R) *R {
+func (b *Builder) Con(rs ...interface{}) *R {
+	return con(b.toRules(rs)...)
+}
+
+func con(rules ...*R) *R {
 	if len(rules) == 1 {
 		return rules[0]
 	}
-	r := newR()
+	r := NewRule()
 	r.Alts = Alts{{r, rules}}
 	return r
 }
 
-func Or(rules ...*R) *R {
+func (b *Builder) Or(rs ...interface{}) *R {
+	return or(b.toRules(rs)...)
+}
+func or(rules ...*R) *R {
 	if len(rules) == 1 {
 		return rules[0]
 	}
-	r := newR()
+	r := NewRule()
 	r.Alts = make(Alts, len(rules))
 	for i := range rules {
 		r.Alts[i] = rules[i].toAlt(r)
@@ -125,17 +170,42 @@ func (r *R) As(name string) *R {
 	return r
 }
 
-func (r *R) ZeroOrOne() *R {
-	return Or(r, Null)
+func (r *R) Optional() *R {
+	return or(r, Null)
 }
 
 func (r *R) OneOrMore() *R {
-	return Con(r, r.ZeroOrMore()).As(r.Name() + "+")
+	return con(r, r.zeroOrMore()).As(r.Name() + "+")
 }
 
-func (r *R) ZeroOrMore() *R {
-	x := newR()
-	x.Alts = Or(Con(r, x), Null).toAlts(x)
+func (r *R) Repeat(limit ...int) *R {
+	switch len(limit) {
+	case 0:
+		return r.zeroOrMore()
+	case 1:
+		n := limit[0]
+		rs := make(Rules, n)
+		for i := range rs {
+			rs[i] = r
+		}
+		return con(rs...)
+	case 2:
+		lo, hi := limit[0], limit[1]
+		if lo > hi {
+			lo, hi = hi, lo
+		}
+		rs := make(Rules, 0, hi-lo+1)
+		for n := lo; n <= hi; n++ {
+			rs = append(rs, r.Repeat(n))
+		}
+		return or(rs...)
+	}
+	panic("repeat should have zero to two arguments")
+}
+
+func (r *R) zeroOrMore() *R {
+	x := NewRule()
+	x.Alts = or(con(r, x), Null).toAlts(x)
 	x.As(r.Name() + "*")
 	return x
 }

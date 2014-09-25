@@ -31,16 +31,18 @@ var _ = gspec.Add(func(s gspec.S) {
 	describe("the parser", func() {
 
 		given("simple arithmetic grammar", func() {
+			b := NewBuilder()
+			Term, Rule, Or, Con := b.Term, b.Rule, b.Or, b.Con
 			var (
 				T    = Term("T")
 				Plus = Term(`+`)
 				Mult = Term(`*`)
 				M    = Rule("M", Or(
 					T,
-					Con(Self("M"), Mult, T),
+					Con(Self, Mult, T),
 				))
 				S = Rule("S", Or(
-					Con(Self("S"), Plus, M),
+					Con(Self, Plus, M),
 					M,
 				))
 				P = Rule("P", S)
@@ -91,10 +93,12 @@ var _ = gspec.Add(func(s gspec.S) {
 		})
 
 		given("a grammar with nullable rule", func() {
+			b := NewBuilder()
+			Term, Rule, Con := b.Term, b.Rule, b.Con
 			var (
 				A = Term("A")
 				B = Term("B")
-				X = Rule("X", B.ZeroOrOne())
+				X = Rule("X", B.Optional())
 				C = Term("C")
 				P = Rule("P", Con(A, X).As("AX"), C)
 			)
@@ -129,6 +133,8 @@ var _ = gspec.Add(func(s gspec.S) {
 		})
 
 		testcase("a trivial but valid nullable rule", func() {
+			b := NewBuilder()
+			Term, Rule := b.Term, b.Rule
 			var (
 				A = Term("A")
 				C = Term("C")
@@ -145,10 +151,12 @@ var _ = gspec.Add(func(s gspec.S) {
 		})
 
 		given("a grammar with zero or more repetition", func() {
+			b := NewBuilder()
+			Term, Rule := b.Term, b.Rule
 			var (
 				A = Term("A")
 				B = Term("B")
-				X = Rule("X", B.ZeroOrMore())
+				X = Rule("X", B.Repeat())
 				C = Term("C")
 				P = Rule("P", A, X, C)
 			)
@@ -199,6 +207,8 @@ var _ = gspec.Add(func(s gspec.S) {
 		})
 
 		given("a grammar with common prefix", func() {
+			b := NewBuilder()
+			Term, Rule, Or := b.Term, b.Rule, b.Or
 			var (
 				A = Term("A")
 				B = Term("B")
