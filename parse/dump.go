@@ -1,6 +1,7 @@
 package parse
 
 import (
+	"bytes"
 	"fmt"
 	"strconv"
 	"strings"
@@ -50,12 +51,19 @@ func (s *state) name() string {
 	return s.Alt.R.Name()
 }
 
+func (s *state) tokenValue() string {
+	if s.token != nil && string(s.token.Value) != "" {
+		return escape(string(s.token.Value))
+	}
+	return "_"
+}
+
 func (s *state) String() string {
-	if s.token != nil {
+	if s.rule().isTerm {
 		if s.d == 0 {
-			return fmt.Sprintf("%s ::= •%v", s.name(), escape(string(s.token.Value)))
+			return fmt.Sprintf("%s ::= •%v", s.name(), s.tokenValue())
 		} else if s.d == 1 {
-			return fmt.Sprintf("%s ::= %v•", s.name(), escape(string(s.token.Value)))
+			return fmt.Sprintf("%s ::= %v•", s.name(), s.tokenValue())
 		}
 	}
 	return fmt.Sprintf("%s ::= %v•%v", s.name(), s.Alt.Rules[:s.d].toString(" "), s.Alt.Rules[s.d:].toString(" "))
@@ -81,10 +89,39 @@ func (s *state) traverse(level int, visit func(*state, int)) {
 	}
 }
 
-func (ss *stateSet) String() string {
+func (s *state) traverseUp(m map[*R]bool, level int, visit func(*state, int)) {
+	if s == nil {
+		return
+	}
+	visit(s, level)
+	if !m[s.rule()] {
+		m[s.rule()] = true
+		for _, c := range s.parents {
+			c.traverseUp(m, level+1, visit)
+		}
+	}
+}
+
+func (s *state) dumpUp(level int) string {
+	var w bytes.Buffer
+	s.traverseUp(make(map[*R]bool), 0, func(st *state, level int) {
+		fmt.Fprintf(&w, "%s%s\n", strings.Repeat("\t", level), st.String())
+	})
+	return w.String()
+}
+
+func (ss states) dumpUp() string {
 	strs := make([]string, 0, len(ss.a))
 	for _, s := range ss.a {
-		strs = append(strs, newNode(s).String())
+		strs = append(strs, s.dumpUp(0))
+	}
+	return strings.Join(strs, "\n")
+}
+
+func (ss states) String() string {
+	strs := make([]string, 0, len(ss.a))
+	for _, s := range ss.a {
+		strs = append(strs, s.String())
 	}
 	return strings.Join(strs, "\n")
 }

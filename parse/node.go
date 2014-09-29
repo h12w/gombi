@@ -72,7 +72,7 @@ func (s *state) find(rule *R) *state {
 	return nil
 }
 func (s *state) leaf() *state {
-	if s.isTerm() {
+	if s.isTerm {
 		return s
 	} else if len(s.values) == 1 {
 		return s.values[0].leaf()

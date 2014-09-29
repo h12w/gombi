@@ -6,7 +6,7 @@ type Parser struct {
 	results   []*Node
 }
 
-func NewParser(r *R) *Parser {
+func New(r *R) *Parser {
 	r.appendEOF()
 	p := &Parser{r: r}
 	p.Reset()
@@ -16,11 +16,18 @@ func (p *Parser) Reset() {
 	p.results = nil
 	p.cur.reset()
 	p.next.reset()
+	m := make(map[*R]bool)
 	p.r.eachAlt(func(a *Alt) {
-		p.cur.predict(&stateSet{}, newState(a))
+		if !m[a.R] {
+			p.cur.predict(&stateSet{}, newState(a)) // TODO: not unique
+			m[a.R] = true
+		}
 	})
 }
 func (r *R) appendEOF() *R {
+	if r.recursive {
+		return con(r, EOF)
+	}
 	for _, a := range r.Alts {
 		if a.last() != EOF {
 			a.Rules = append(a.Rules, EOF)
@@ -38,14 +45,15 @@ func (p *Parser) Parse(t *Token, tr *R) bool {
 			p.results = append(p.results, p.next.propagate(pset, s)...)
 		}
 	})
+	//fmt.Println("### token ->", tr)
+	//fmt.Printf("### cur set ->\n%s\n", p.cur.dumpUp())
+	//fmt.Println()
+	//fmt.Printf("### predict set ->\n%s\n", pset.String())
+	//fmt.Println()
 	p.shift()
 	return true
 }
 func (p *Parser) shift() {
-	//fmt.Printf("predict set -> %s\n", p.pset.String())
-	//fmt.Println()
-	//fmt.Printf("terminal set -> %s\n", p.next.String())
-	//fmt.Println()
 	p.cur, p.next = p.next, p.cur.reset()
 }
 
@@ -73,7 +81,7 @@ func (ss *states) propagate(pset *stateSet, s *state) (results []*Node) {
 }
 
 func (ss *states) predict(pset *stateSet, s *state) {
-	if s.isTerm() {
+	if s.isTerm {
 		ss.append(s)
 		return
 	}
@@ -81,7 +89,7 @@ func (ss *states) predict(pset *stateSet, s *state) {
 		if alt.isNull() {
 			// copied because other alternatives should not be skipped
 			ss.predictNull(pset, s.copy().step())
-		} else if child := newState(alt); pset.add(child, s) {
+		} else if child, isNew := pset.add(alt, s); isNew {
 			ss.predict(pset, child)
 		}
 	})

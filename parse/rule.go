@@ -22,6 +22,7 @@ type (
 	R struct {
 		name string
 		Alts
+		isTerm    bool
 		recursive bool
 	}
 	Alt struct {
@@ -36,27 +37,31 @@ type (
 )
 
 var (
-	EOF  = NewRule().As("EOF")
-	Null = NewRule().As("Null")
-	Self = NewRule()
+	EOF  = newTerm().As("EOF")
+	Null = newTerm().As("Null")
+	Self = newTerm()
 )
 
 func NewBuilder() *Builder {
 	return &Builder{terms: make(map[string]*R)}
 }
 
-func NewRule() *R {
+func newTerm() *R {
 	r := &R{}
-	r.Alts = Alts{{R: r, Rules: Rules{nil}}}
+	r.isTerm = true
+	r.Alts = Alts{{R: r}}
 	return r
+}
+
+func NewRule() *R {
+	return &R{}
 }
 
 func (b *Builder) Term(name string) *R {
 	if r, ok := b.terms[name]; ok {
 		return r
 	}
-	r := NewRule()
-	r.Alts = Alts{{R: r, Rules: Rules{nil}}}
+	r := newTerm()
 	r = r.As(name)
 	b.terms[name] = r
 	return r
@@ -82,9 +87,9 @@ func (b *Builder) toRules(a []interface{}) []*R {
 	return rs
 }
 
-func (r *R) isTerm() bool {
-	return len(r.Alts) == 1 && len(r.Alts[0].Rules) == 1 && r.Alts[0].Rules[0] == nil
-}
+//func (r *R) isTerm() bool {
+//	return len(r.Alts) == 1 && len(r.Alts[0].Rules) == 1 && r.Alts[0].Rules[0] == nil
+//}
 
 func (b *Builder) Recur(rules ...interface{}) *R {
 	r := b.Con(rules...)
@@ -104,7 +109,7 @@ func (r *R) wrap() *R {
 	return nr
 }
 func (r *R) initRecursiveRule(m map[*R]bool, selfValue *R) {
-	if r.isTerm() {
+	if r.isTerm {
 		return
 	}
 	if m[r] {
@@ -127,7 +132,11 @@ func (r *R) initRecursiveRule(m map[*R]bool, selfValue *R) {
 }
 
 func (r *R) Define(o *R) *R {
+	r.recursive = true
 	r.Alts = o.Alts
+	for i := range r.Alts {
+		r.Alts[i].R = r
+	}
 	return r
 }
 
@@ -175,7 +184,7 @@ func (r *R) Optional() *R {
 }
 
 func (r *R) OneOrMore() *R {
-	return con(r, r.zeroOrMore()).As(r.Name() + "+")
+	return con(r, r.zeroOrMore()) //.As(r.Name() + "+")
 }
 
 func (r *R) Repeat(limit ...int) *R {
@@ -205,6 +214,7 @@ func (r *R) Repeat(limit ...int) *R {
 
 func (r *R) zeroOrMore() *R {
 	x := NewRule()
+	//x.recursive = true
 	x.Alts = or(con(r, x), Null).toAlts(x)
 	x.As(r.Name() + "*")
 	return x

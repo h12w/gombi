@@ -52,6 +52,9 @@ func (s *state) nextChildRule() *R {
 }
 
 func (s *state) complete() bool {
+	if s.isTerm {
+		return s.d == 1
+	}
 	return s.d == len(s.Alt.Rules)
 }
 
@@ -95,23 +98,28 @@ type stateSet struct {
 	states
 }
 
-func (ss *stateSet) add(o, parent *state) (isNew bool) {
+func (ss *stateSet) add(o *Alt, parent *state) (child *state, isNew bool) {
 	if s, ok := ss.find(o); ok {
-		o = s
+		child = s
 	} else {
-		ss.a = append(ss.a, o)
+		child = newState(o)
+		ss.a = append(ss.a, child)
 		isNew = true
 	}
-	if parent != nil {
-		o.parents = append(o.parents, parent)
-	}
+	//parent != nil
+	child.parents = append(child.parents, parent)
 	return
 }
-func (ss *stateSet) find(o *state) (*state, bool) {
+func (ss *stateSet) find(o *Alt) (*state, bool) {
 	for _, s := range ss.a {
-		if s.Alt == o.Alt && s.d == o.d {
+		if s.Alt == o /*.Alt && s.d == o.d*/ {
 			return s, true
 		}
 	}
 	return nil, false
+}
+
+func (ss *stateSet) reset() stateSet {
+	ss.states = ss.states.reset()
+	return *ss
 }

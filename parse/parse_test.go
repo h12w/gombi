@@ -251,7 +251,7 @@ func TestAll(t *testing.T) {
 func testParse(s gspec.S, P *R, tokens TT, expected string) {
 	expect := gspec.Expect(s.FailNow, 1)
 	scanner := newTestScanner(append(tokens, tok("", EOF)))
-	parser := NewParser(P)
+	parser := New(P)
 	for scanner.Scan() {
 		parser.Parse(scanner.Token())
 	}

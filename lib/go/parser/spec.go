@@ -1,6 +1,10 @@
 package parser
 
-import "github.com/hailiang/gombi/parse"
+import (
+	"go/token"
+
+	"github.com/hailiang/gombi/parse"
+)
 
 var (
 	builder = parse.NewBuilder()
@@ -19,18 +23,25 @@ var (
 	}
 
 	declList = func(item *parse.R) *parse.R {
-		return or(item, con("(", repeat(item, ";"), ")"))
+		return or(item, con("(", repeat(item, ";"), opt(item), ")"))
 	}
+
+	identifier   = term("identifier")
+	stringLit    = term("string")
+	runeLit      = term("rune")
+	intLit       = term("int")
+	floatLit     = term("float")
+	imaginaryLit = term("imag")
 
 	// Packages
 
-	sourceFile = con(packageClause, ";", repeat(importDecl, ";"), repeat(topLevelDecl, ";"))
+	sourceFile = con(packageClause, ";", repeat(importDecl, ";"), repeat(topLevelDecl, ";")).As("sourceFile")
 
-	packageClause = con("package", packageName)
-	packageName   = identifier
+	packageClause = con("package", packageName).As("packageClause")
+	packageName   = identifier // As??
 
-	importDecl = con("import", declList(importSpec))
-	importSpec = con(or("dot", packageName).Optional(), importPath)
+	importDecl = con("import", declList(importSpec)).As("importDecl")
+	importSpec = con(or("dot", packageName).Optional(), importPath).As("importSpec")
 	importPath = stringLit
 
 	// Declarations
@@ -62,8 +73,8 @@ var (
 
 	// block
 
-	block         = con("{", statementList, "}")
-	statementList = repeat(statement, ";")
+	block         = con("{", statementList, opt(statement), "}").As("block")
+	statementList = repeat(statement, ";").As("statementList")
 
 	// Statements
 	statement = newRule()
@@ -132,63 +143,56 @@ var (
 
 	// Expression
 
-	expression = newRule()
-	_          = expression.Define(con(or(unaryExpr, con(expression, binaryOp, unaryExpr))))
-	unaryExpr  = newRule()
+	expression = newRule().As("expression")
+	_          = expression.Define(or(unaryExpr, con(expression, binaryOp, unaryExpr)))
+	unaryExpr  = newRule().As("unaryExpr")
 	_          = unaryExpr.Define(or(primaryExpr, con(unaryOp, unaryExpr)))
 
-	identifier   = term("identifier")
-	stringLit    = term("string")
-	runeLit      = term("rune")
-	intLit       = term("int")
-	floatLit     = term("float")
-	imaginaryLit = term("imag")
+	operand     = or(literal, operandName, methodExpr, con("(", expression, ")")).As("operand")
+	literal     = or(basicLit, compositeLit, functionLit).As("literal")
+	basicLit    = or(intLit, floatLit, imaginaryLit, runeLit, stringLit).As("basicLit")
+	operandName = or(identifier, qualifiedIdent).As("operandName")
 
-	operand     = or(literal, operandName, methodExpr, "(", expression, ")")
-	literal     = or(basicLit, compositeLit, functionLit)
-	basicLit    = or(intLit, floatLit, imaginaryLit, runeLit, stringLit)
-	operandName = or(identifier, qualifiedIdent)
+	qualifiedIdent = con(packageName, ".", identifier).As("qualifiedIdent")
 
-	qualifiedIdent = con(packageName, ".", identifier)
-
-	compositeLit = con(literalType, literalValue)
+	compositeLit = con(literalType, literalValue).As("compositeLit")
 	literalType  = or(structType, arrayType, con("[", "...", "]", elementType),
-		sliceType, mapType, typeName)
-	literalValue = newRule()
+		sliceType, mapType, typeName).As("literalType")
+	literalValue = newRule().As("literalValue")
 	_            = literalValue.Define(con("{", opt(elementList, opt(",")), "}"))
-	elementList  = con(element, repeat(",", element))
-	element      = con(opt(key, ":"), value)
-	key          = or(fieldName, elementIndex)
+	elementList  = con(element, repeat(",", element)).As("elementList")
+	element      = con(opt(key, ":"), value).As("element")
+	key          = or(fieldName, elementIndex).As("key")
 	fieldName    = identifier
 	elementIndex = expression
-	value        = or(expression, literalValue)
+	value        = or(expression, literalValue).As("value")
 
-	functionLit = con("func", function)
+	functionLit = con("func", function).As("functionLit")
 
-	primaryExpr = newRule()
+	primaryExpr = newRule().As("primaryExpr")
 	_           = primaryExpr.Define(or(operand, conversion, builtinCall, con(primaryExpr, selector), con(primaryExpr, index),
 		con(primaryExpr, slice),
 		con(primaryExpr, typeAssertion),
 		con(primaryExpr, call)))
-	selector = con(".", identifier)
-	index    = con("[", expression, "]")
+	selector = con(".", identifier).As("selector")
+	index    = con("[", expression, "]").As("index")
 	slice    = con("[", or(con(opt(expression), ":", opt(expression)),
-		con(opt(expression), ":", expression, ":", expression), "]"))
-	typeAssertion = con(".", "(", type_, ")")
-	call          = con("(", opt(argumentList, opt(",")), ")")
-	argumentList  = con(expressionList, opt("..."))
+		con(opt(expression), ":", expression, ":", expression), "]")).As("slice")
+	typeAssertion = con(".", "(", type_, ")").As("typeAssertion")
+	call          = con("(", opt(argumentList, opt(",")), ")").As("call")
+	argumentList  = con(expressionList, opt("...")).As("argumentList")
 
-	binaryOp = or("||", "&&", relOp, addOp, mulOp)
+	binaryOp = or("||", "&&", relOp, addOp, mulOp).As("binaryOp")
 	relOp    = or("==", "!=", "<", "<=", ">", ">=")
 	addOp    = or("+", "-", "|", "^")
 	mulOp    = or("*", "/", "%", "<<", ">>", "&", "&^")
 	unaryOp  = or("+", "-", "!", "^", "*", "&", "<-")
 
-	methodExpr   = con(receiverType, ".", methodName)
-	receiverType = newRule()
+	methodExpr   = con(receiverType, ".", methodName).As("methodExpr")
+	receiverType = newRule().As("receiverType")
 	_            = receiverType.Define(or(typeName, con("(", "*", typeName, ")"), con("(", receiverType, ")")))
 
-	conversion = con(type_, "(", expression, opt(","), ")")
+	conversion = con(type_, "(", expression, opt(","), ")").As("conversion")
 
 	// Built-in functions
 
@@ -197,40 +201,140 @@ var (
 
 	// Types
 
-	type_    = newRule()
+	type_    = newRule().As("type")
 	_        = type_.Define(or(typeName, typeLit, con("(", type_, ")")))
-	typeName = or(identifier, qualifiedIdent)
+	typeName = or(identifier, qualifiedIdent).As("typeName")
 	typeLit  = or(arrayType, structType, pointerType, functionType, interfaceType,
-		sliceType, mapType, channelType)
+		sliceType, mapType, channelType).As("typeLit")
 
-	arrayType   = con("[", arrayLength, "]", elementType)
+	arrayType   = con("[", arrayLength, "]", elementType).As("arrayType")
 	arrayLength = expression
 	elementType = type_
 
-	sliceType = con("[", "]", elementType)
+	sliceType = con("[", "]", elementType).As("sliceType")
 
-	structType     = con("struct", "{", repeat(fieldDecl, ";"), "}")
-	fieldDecl      = con(or(con(identifierList, type_), anonymousField), opt(tag))
-	anonymousField = con(term("*").Optional(), typeName)
+	structType     = con("struct", "{", repeat(fieldDecl, ";"), opt(fieldDecl), "}").As("structType")
+	fieldDecl      = con(or(con(identifierList, type_), anonymousField), opt(tag)).As("fieldDecl")
+	anonymousField = con(term("*").Optional(), typeName).As("anonymousField")
 	tag            = stringLit
 
-	pointerType = con("*", baseType)
+	pointerType = con("*", baseType).As("pointerType")
 	baseType    = type_
 
-	functionType  = con("func", signature)
-	signature     = con(parameters, opt(result))
-	result        = or(parameters, type_)
-	parameters    = con("(", opt(parameterList, opt(",")), ")")
-	parameterList = con(parameterDecl, repeat(",", parameterDecl))
-	parameterDecl = con(opt(identifierList), opt("..."), type_)
+	functionType  = con("func", signature).As("functionType")
+	signature     = con(parameters, opt(result)).As("siginature")
+	result        = or(parameters, type_).As("result")
+	parameters    = con("(", opt(parameterList, opt(",")), ")").As("parameters")
+	parameterList = con(parameterDecl, repeat(",", parameterDecl)).As("parameterList")
+	parameterDecl = con(opt(identifierList), opt("..."), type_).As("parameterDecl")
 
-	interfaceType     = con("interface", "{", repeat(methodSpec, ";"), "}")
-	methodSpec        = or(con(methodName, signature), interfaceTypeName)
+	interfaceType     = con("interface", "{", repeat(methodSpec, ";"), opt(methodSpec), "}").As("interfaceType")
+	methodSpec        = or(con(methodName, signature), interfaceTypeName).As("methodSpec")
 	methodName        = identifier
 	interfaceTypeName = typeName
 
-	mapType = con("map", "[", keyType, "]", elementType)
+	mapType = con("map", "[", keyType, "]", elementType).As("mapType")
 	keyType = type_
 
-	channelType = con(or(con("chan", opt("<-")), con("<-", "chan")), elementType)
+	channelType = con(or(con("chan", opt("<-")), con("<-", "chan")), elementType).As("channelType")
+
+	tokenTable = toTokenTable([]interface{}{
+		//token.ILLEGAL:        ,
+		token.EOF: parse.EOF,
+		//token.COMMENT:        ,
+		token.IDENT:          identifier,
+		token.INT:            intLit,
+		token.FLOAT:          floatLit,
+		token.IMAG:           imaginaryLit,
+		token.CHAR:           runeLit,
+		token.STRING:         stringLit,
+		token.ADD:            "+",
+		token.SUB:            "-",
+		token.MUL:            "*",
+		token.QUO:            "/",
+		token.REM:            "%",
+		token.AND:            "&",
+		token.OR:             "|",
+		token.XOR:            "^",
+		token.SHL:            "<<",
+		token.SHR:            ">>",
+		token.AND_NOT:        "&^",
+		token.ADD_ASSIGN:     "+=",
+		token.SUB_ASSIGN:     "-=",
+		token.MUL_ASSIGN:     "*=",
+		token.QUO_ASSIGN:     "/=",
+		token.REM_ASSIGN:     "%=",
+		token.AND_ASSIGN:     "&=",
+		token.OR_ASSIGN:      "|=",
+		token.XOR_ASSIGN:     "^=",
+		token.SHL_ASSIGN:     "<<=",
+		token.SHR_ASSIGN:     ">>=",
+		token.AND_NOT_ASSIGN: "&^=",
+		token.LAND:           "&&",
+		token.LOR:            "||",
+		token.ARROW:          "<-",
+		token.INC:            "++",
+		token.DEC:            "--",
+		token.EQL:            "==",
+		token.LSS:            "<",
+		token.GTR:            ">",
+		token.ASSIGN:         "=",
+		token.NOT:            "!",
+		token.NEQ:            "!=",
+		token.LEQ:            "<=",
+		token.GEQ:            ">=",
+		token.DEFINE:         ":=",
+		token.ELLIPSIS:       "...",
+		token.LPAREN:         "(",
+		token.LBRACK:         "[",
+		token.LBRACE:         "{",
+		token.COMMA:          ",",
+		token.PERIOD:         ".",
+		token.RPAREN:         ")",
+		token.RBRACK:         "]",
+		token.RBRACE:         "}",
+		token.SEMICOLON:      ";",
+		token.COLON:          ":",
+		token.BREAK:          "break",
+		token.CASE:           "case",
+		token.CHAN:           "chan",
+		token.CONST:          "const",
+		token.CONTINUE:       "continue",
+		token.DEFAULT:        "default",
+		token.DEFER:          "defer",
+		token.ELSE:           "else",
+		token.FALLTHROUGH:    "fallthrough",
+		token.FOR:            "for",
+		token.FUNC:           "func",
+		token.GO:             "go",
+		token.GOTO:           "goto",
+		token.IF:             "if",
+		token.IMPORT:         "import",
+		token.INTERFACE:      "interface",
+		token.MAP:            "map",
+		token.PACKAGE:        "package",
+		token.RANGE:          "range",
+		token.RETURN:         "return",
+		token.SELECT:         "select",
+		token.STRUCT:         "struct",
+		token.SWITCH:         "switch",
+		token.TYPE:           "type",
+		token.VAR:            "var",
+	})
 )
+
+func toTokenTable(a []interface{}) []*parse.R {
+	rs := make([]*parse.R, len(a))
+	for i := range a {
+		switch o := a[i].(type) {
+		case nil:
+		case *parse.R:
+			rs[i] = o
+		case string:
+			rs[i] = builder.Term(o)
+		default:
+			panic("element should be a string or a *parse.R")
+		}
+	}
+	return rs
+}
