@@ -38,6 +38,7 @@ type (
 
 var (
 	EOF  = newTerm().As("EOF")
+	SOF  = newTerm().As("SOF")
 	Null = newTerm().As("Null")
 	Self = newTerm()
 )

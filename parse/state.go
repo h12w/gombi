@@ -15,6 +15,7 @@ type matchingRule struct {
 	token   *Token
 }
 type Token struct {
+	ID    int
 	Value []byte
 	Pos   int
 }
@@ -24,13 +25,6 @@ func newState(alt *Alt) *state {
 		matchingRule: &matchingRule{Alt: alt},
 		values:       make([]*state, len(alt.Rules)),
 	}
-}
-
-// newTermState intializes a parsed state for a terminal rule from a token.
-func newTermState(t *Token, r *R) *state {
-	s := newState(r.Alts[0])
-	s.token = t
-	return s
 }
 
 func (s *state) copy() *state {

@@ -27,6 +27,10 @@ func (n *Node) ChildCount() int {
 	return len(n.values)
 }
 
+func (n *Node) ID() int {
+	return n.token.ID
+}
+
 func (n *Node) Value() []byte {
 	return n.token.Value
 }

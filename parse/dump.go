@@ -55,7 +55,7 @@ func (s *state) tokenValue() string {
 	if s.token != nil && string(s.token.Value) != "" {
 		return escape(string(s.token.Value))
 	}
-	return "_"
+	return ""
 }
 
 func (s *state) String() string {

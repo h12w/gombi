@@ -14,6 +14,7 @@ var (
 	or      = builder.Or
 	con     = builder.Con
 	null    = parse.Null
+	EOF     = parse.EOF
 	newRule = parse.NewRule
 	opt     = func(rules ...interface{}) *parse.R {
 		return con(rules...).Optional()
@@ -32,6 +33,9 @@ var (
 	intLit       = term("int")
 	floatLit     = term("float")
 	imaginaryLit = term("imag")
+
+	// goExpr
+	goExpr = con(or(expression, type_), ";", EOF).As("goExpr")
 
 	// Packages
 

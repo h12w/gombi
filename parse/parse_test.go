@@ -267,5 +267,5 @@ type testToken struct {
 type TT []*testToken
 
 func tok(v string, r *R) *testToken {
-	return &testToken{&Token{[]byte(v), 0}, r}
+	return &testToken{&Token{ID: 0, Value: []byte(v), Pos: 0}, r}
 }
