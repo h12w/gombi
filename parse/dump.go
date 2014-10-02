@@ -110,17 +110,17 @@ func (s *state) dumpUp(level int) string {
 	return w.String()
 }
 
-func (ss states) dumpUp() string {
-	strs := make([]string, 0, len(ss.a))
-	for _, s := range ss.a {
+func (ss *stateSet) dumpUp() string {
+	strs := make([]string, 0, len(ss.m))
+	for _, s := range ss.m {
 		strs = append(strs, s.dumpUp(0))
 	}
 	return strings.Join(strs, "\n")
 }
 
-func (ss states) String() string {
-	strs := make([]string, 0, len(ss.a))
-	for _, s := range ss.a {
+func (ss *stateSet) String() string {
+	strs := make([]string, 0, len(ss.m))
+	for _, s := range ss.m {
 		strs = append(strs, s.String())
 	}
 	return strings.Join(strs, "\n")

@@ -52,35 +52,35 @@ func (s *state) complete() bool {
 	return s.d == len(s.Alt.Rules)
 }
 
-// not copied because a terminal state can never be a parent of multiple children
-func (s *state) scan(t *Token, r *R) {
+func (s *state) scan(t *Token) {
+	// not copied because a terminal state can never be a parent of multiple children
 	s.token = t
 	s.step()
 }
 
-// copied because multiple alternatives shares the same parent
 func (s *state) advance(t *state) *state {
+	// copied because multiple alternatives shares the same parent
 	ns := s.copy()
 	ns.values[s.d] = t
 	return ns.step()
 }
 
-type states struct {
-	a []*state
-}
-
 type stateSet struct {
 	termRule  *R
 	termState *state
-	states
+	m         map[*Alt]*state
 }
 
-func (ss *stateSet) add(o *Alt, parent *state) (child *state, isNew bool) {
-	if s, ok := ss.find(o); ok {
+func newStateSet(tr *R) stateSet {
+	return stateSet{termRule: tr, m: make(map[*Alt]*state)}
+}
+
+func (ss *stateSet) add(alt *Alt, parent *state) (child *state, isNew bool) {
+	if s, ok := ss.m[alt]; ok {
 		child = s
 	} else {
-		child = newState(o)
-		ss.a = append(ss.a, child)
+		child = newState(alt)
+		ss.m[alt] = child
 		isNew = true
 	}
 	if child.rule() == ss.termRule {
@@ -89,12 +89,4 @@ func (ss *stateSet) add(o *Alt, parent *state) (child *state, isNew bool) {
 	// parent != nil
 	child.parents = append(child.parents, parent)
 	return
-}
-func (ss *stateSet) find(o *Alt) (*state, bool) {
-	for _, s := range ss.a {
-		if s.Alt == o {
-			return s, true
-		}
-	}
-	return nil, false
 }
