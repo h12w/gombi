@@ -31,26 +31,29 @@ func (r *R) appendEOF() *R {
 }
 
 func (p *Parser) Parse(t *Token, tr *R) bool {
-	pset := &stateSet{termRule: tr}
-	if p.s == nil {
-		p.r.eachAlt(func(alt *Alt) {
-			pset.predictAll(newState(alt), tr)
-		})
-	} else {
-		pset.predictAll(p.s, tr)
-	}
-	p.s = pset.termState
+	p.s = p.predict(tr)
 	if p.s == nil {
 		return false
 	}
-	if p.s.scan(t, tr) {
-		p.results = append(p.results, p.s.propagate()...)
+	p.s.scan(t, tr)
+	p.results = append(p.results, p.s.propagate()...)
+	return true
+}
+
+func (p *Parser) predict(tr *R) *state {
+	pset := &stateSet{termRule: tr}
+	if p.s == nil {
+		p.r.eachAlt(func(alt *Alt) {
+			pset.predictAll(newState(alt))
+		})
+	} else {
+		pset.predictAll(p.s)
 	}
-	//fmt.Printf("### term state ->\n%s\n", p.s.dumpUp(0))
+	//fmt.Printf("### term state ->\n%s\n", pset.termState.dumpUp(0))
 	//fmt.Println()
 	//fmt.Printf("### predict set ->\n%s\n", pset.String())
 	//fmt.Println()
-	return true
+	return pset.termState
 }
 
 func (p *Parser) Error() error {
@@ -59,17 +62,6 @@ func (p *Parser) Error() error {
 
 func (p *Parser) Results() (rs []*Node) {
 	return p.results
-}
-
-func (pset *stateSet) predictAll(s *state, termRule *R) {
-	if s.complete() {
-		for _, parent := range s.parents {
-			pset.predictAll(parent.advance(s), termRule)
-		}
-	} else {
-		pset.predict(s, termRule)
-	}
-	return
 }
 
 func (s *state) propagate() (results []*Node) {
@@ -85,26 +77,37 @@ func (s *state) propagate() (results []*Node) {
 	return
 }
 
-func (pset *stateSet) predict(s *state, termRule *R) {
+func (pset *stateSet) predictAll(s *state) {
+	if s.complete() {
+		for _, parent := range s.parents {
+			pset.predictAll(parent.advance(s))
+		}
+	} else {
+		pset.predict(s)
+	}
+	return
+}
+
+func (pset *stateSet) predict(s *state) {
 	if s.isTerm {
 		return
 	}
 	s.nextChildRule().eachAlt(func(alt *Alt) {
 		if alt.isNull() {
 			// copied because other alternatives should not be skipped
-			pset.predictNull(s.copy().step(), termRule)
+			pset.predictNull(s.copy().step())
 		} else if child, isNew := pset.add(alt, s); isNew {
-			pset.predict(child, termRule)
+			pset.predict(child)
 		}
 	})
 }
 
-func (pset *stateSet) predictNull(s *state, termRule *R) {
+func (pset *stateSet) predictNull(s *state) {
 	if s.complete() {
 		for _, parent := range s.parents {
-			pset.predictNull(parent.advance(s), termRule)
+			pset.predictNull(parent.advance(s))
 		}
 	} else {
-		pset.predict(s, termRule)
+		pset.predict(s)
 	}
 }

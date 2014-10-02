@@ -53,13 +53,9 @@ func (s *state) complete() bool {
 }
 
 // not copied because a terminal state can never be a parent of multiple children
-func (s *state) scan(t *Token, r *R) bool {
-	if s.rule() == r {
-		s.token = t
-		s.step()
-		return true
-	}
-	return false
+func (s *state) scan(t *Token, r *R) {
+	s.token = t
+	s.step()
 }
 
 // copied because multiple alternatives shares the same parent
@@ -71,21 +67,6 @@ func (s *state) advance(t *state) *state {
 
 type states struct {
 	a []*state
-}
-
-func (ss *states) reset() states {
-	ss.a = ss.a[:0]
-	return *ss
-}
-
-func (ss *states) append(s *state) {
-	ss.a = append(ss.a, s)
-}
-
-func (ss *states) each(visit func(*state)) {
-	for _, s := range ss.a {
-		visit(s)
-	}
 }
 
 type stateSet struct {
@@ -102,12 +83,11 @@ func (ss *stateSet) add(o *Alt, parent *state) (child *state, isNew bool) {
 		ss.a = append(ss.a, child)
 		isNew = true
 	}
-	if isNew && child.rule() == ss.termRule {
+	if child.rule() == ss.termRule {
 		ss.termState = child
 	}
-	if parent != nil {
-		child.parents = append(child.parents, parent)
-	}
+	// parent != nil
+	child.parents = append(child.parents, parent)
 	return
 }
 func (ss *stateSet) find(o *Alt) (*state, bool) {
