@@ -1,10 +1,9 @@
 package parse
 
 type Parser struct {
-	r         *R
-	cur, next states
-	results   []*Node
-	lastTok   *R
+	r       *R
+	s       *state
+	results []*Node
 }
 
 func New(r *R) *Parser {
@@ -15,13 +14,7 @@ func New(r *R) *Parser {
 }
 func (p *Parser) Reset() {
 	p.results = nil
-	p.cur.reset()
-	p.next.reset()
-	//pset := &stateSet{}
-	//p.cur.each(func(s *state) {
-	//	p.next.predictAll(pset, s, nil) // TODO: not unique
-	//})
-	//p.Parse(nil, SOF)
+	p.s = nil
 }
 func (r *R) appendEOF() *R {
 	if r.recursive {
@@ -37,41 +30,27 @@ func (r *R) appendEOF() *R {
 	return r
 }
 
-func (p *Parser) Parse(t *Token, tr *R) (ok bool) {
-	//fmt.Println("scanning", newTermState(t, r))
-	//fmt.Println()
-	pset := &stateSet{}
-	if p.lastTok == nil {
+func (p *Parser) Parse(t *Token, tr *R) bool {
+	pset := &stateSet{termRule: tr}
+	if p.s == nil {
 		p.r.eachAlt(func(alt *Alt) {
-			p.cur.predictAll(pset, newState(alt), tr)
+			pset.predictAll(newState(alt), tr)
 		})
+	} else {
+		pset.predictAll(p.s, tr)
 	}
-	if len(p.cur.a) == 0 {
+	p.s = pset.termState
+	if p.s == nil {
 		return false
 	}
-	p.cur.each(func(s *state) {
-		if s.rule() == p.lastTok || p.lastTok == nil {
-			p.next.predictAll(pset, s, tr)
-		}
-	})
-	p.shift()
-	pset = &stateSet{}
-	p.cur.each(func(s *state) {
-		if s.scan(t, tr) {
-			ok = true
-			p.results = append(p.results, s.propagate()...)
-		}
-	})
-	p.lastTok = tr
-	//fmt.Println("### token ->", tr)
-	//fmt.Printf("### cur set ->\n%s\n", p.cur.dumpUp())
+	if p.s.scan(t, tr) {
+		p.results = append(p.results, p.s.propagate()...)
+	}
+	//fmt.Printf("### term state ->\n%s\n", p.s.dumpUp(0))
 	//fmt.Println()
 	//fmt.Printf("### predict set ->\n%s\n", pset.String())
 	//fmt.Println()
-	return
-}
-func (p *Parser) shift() {
-	p.cur, p.next = p.next, p.cur.reset()
+	return true
 }
 
 func (p *Parser) Error() error {
@@ -82,13 +61,13 @@ func (p *Parser) Results() (rs []*Node) {
 	return p.results
 }
 
-func (ss *states) predictAll(pset *stateSet, s *state, termRule *R) {
+func (pset *stateSet) predictAll(s *state, termRule *R) {
 	if s.complete() {
 		for _, parent := range s.parents {
-			ss.predictAll(pset, parent.advance(s), termRule)
+			pset.predictAll(parent.advance(s), termRule)
 		}
 	} else {
-		ss.predict(pset, s, termRule)
+		pset.predict(s, termRule)
 	}
 	return
 }
@@ -106,29 +85,26 @@ func (s *state) propagate() (results []*Node) {
 	return
 }
 
-func (ss *states) predict(pset *stateSet, s *state, termRule *R) {
+func (pset *stateSet) predict(s *state, termRule *R) {
 	if s.isTerm {
-		if termRule == nil || termRule == s.rule() {
-			ss.append(s)
-		}
 		return
 	}
 	s.nextChildRule().eachAlt(func(alt *Alt) {
 		if alt.isNull() {
 			// copied because other alternatives should not be skipped
-			ss.predictNull(pset, s.copy().step(), termRule)
+			pset.predictNull(s.copy().step(), termRule)
 		} else if child, isNew := pset.add(alt, s); isNew {
-			ss.predict(pset, child, termRule)
+			pset.predict(child, termRule)
 		}
 	})
 }
 
-func (ss *states) predictNull(pset *stateSet, s *state, termRule *R) {
+func (pset *stateSet) predictNull(s *state, termRule *R) {
 	if s.complete() {
 		for _, parent := range s.parents {
-			ss.predictNull(pset, parent.advance(s), termRule)
+			pset.predictNull(parent.advance(s), termRule)
 		}
 	} else {
-		ss.predict(pset, s, termRule)
+		pset.predict(s, termRule)
 	}
 }

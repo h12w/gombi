@@ -89,6 +89,8 @@ func (ss *states) each(visit func(*state)) {
 }
 
 type stateSet struct {
+	termRule  *R
+	termState *state
 	states
 }
 
@@ -100,20 +102,19 @@ func (ss *stateSet) add(o *Alt, parent *state) (child *state, isNew bool) {
 		ss.a = append(ss.a, child)
 		isNew = true
 	}
-	//parent != nil
-	child.parents = append(child.parents, parent)
+	if isNew && child.rule() == ss.termRule {
+		ss.termState = child
+	}
+	if parent != nil {
+		child.parents = append(child.parents, parent)
+	}
 	return
 }
 func (ss *stateSet) find(o *Alt) (*state, bool) {
 	for _, s := range ss.a {
-		if s.Alt == o /*.Alt && s.d == o.d*/ {
+		if s.Alt == o {
 			return s, true
 		}
 	}
 	return nil, false
-}
-
-func (ss *stateSet) reset() stateSet {
-	ss.states = ss.states.reset()
-	return *ss
 }
