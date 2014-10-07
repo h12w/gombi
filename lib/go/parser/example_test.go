@@ -6,8 +6,9 @@ package parser_test
 
 import (
 	"fmt"
-	"go/parser"
 	"go/token"
+
+	"github.com/hailiang/gombi/lib/go/parser"
 )
 
 func ExampleParseFile() {
@@ -29,6 +30,6 @@ func ExampleParseFile() {
 	// output:
 	//
 	// "fmt"
-	// "go/parser"
 	// "go/token"
+	// "github.com/hailiang/gombi/lib/go/parser"
 }

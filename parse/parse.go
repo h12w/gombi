@@ -65,6 +65,14 @@ func (p *Parser) Results() []*Node {
 func (p *Parser) propagate(s *state) {
 	if s.complete() {
 		if s.last().isEOF() {
+			parents := s.values[len(s.values)-1].parents
+			if len(parents) > 5184 {
+				//fmt.Println("HERE")
+				//for i := range parents {
+				//	fmt.Printf("%p\n", parents[i])
+				//}
+				//panic("")
+			}
 			p.results = append(p.results, newNode(s))
 		} else {
 			for _, parent := range s.parents {

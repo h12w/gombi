@@ -217,7 +217,7 @@ func (r *R) zeroOrMore() *R {
 	x := NewRule()
 	//x.recursive = true
 	x.Alts = or(con(r, x), Null).toAlts(x)
-	x.As(r.Name() + "*")
+	x.As(parens(r.Name()) + "*")
 	return x
 }
 func (r *R) toAlts(parent *R) Alts {

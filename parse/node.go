@@ -16,10 +16,16 @@ func (n *Node) Alt() *Alt {
 }
 
 func (n *Node) Rule() *R {
+	if n == nil {
+		return nil
+	}
 	return n.state.Alt.R
 }
 
 func (n *Node) Child(i int) *Node {
+	if n == nil {
+		return nil
+	}
 	return newNode(n.values[i])
 }
 
@@ -36,6 +42,9 @@ func (n *Node) Value() []byte {
 }
 
 func (n *Node) Pos() int {
+	if n == nil {
+		return 0
+	}
 	return n.token.Pos
 }
 

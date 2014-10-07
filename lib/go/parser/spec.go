@@ -34,8 +34,8 @@ var (
 	floatLit     = term("float")
 	imaginaryLit = term("imag")
 
-	// goExpr
-	goExpr = con(or(expression, type_), ";", EOF).As("goExpr")
+	// sourceExpr
+	sourceExpr = con(or(expr, type_), ";", EOF).As("sourceExpr")
 
 	// Packages
 
@@ -50,141 +50,149 @@ var (
 
 	// Declarations
 
-	declaration  = or(constDecl, typeDecl, varDecl)
-	topLevelDecl = or(declaration, functionDecl, methodDecl)
+	decl         = or(constDecl, typeDecl, varDecl).As("decl")
+	topLevelDecl = or(decl, funcDecl, methodDecl).As("topLevelDecl")
 
-	constDecl      = con("const", declList(constSpec))
-	constSpec      = con(identifierList, opt(opt("type"), "=", expressionList))
-	identifierList = con(identifier, repeat(";", identifier))
-	expressionList = con(expression, repeat(";", expression))
+	constDecl      = con("const", declList(constSpec)).As("constDecl")
+	constSpec      = con(identifierList, opt(opt("type"), "=", exprList)).As("constSpec")
+	identifierList = con(identifier, repeat(",", identifier)).As("identifierList")
+	exprList       = con(expr, repeat(",", expr)).As("exprList")
 
-	typeDecl = con("type", declList(typeSpec))
-	typeSpec = con(identifier, type_)
+	typeDecl = con("type", declList(typeSpec)).As("typeDecl")
+	typeSpec = con(identifier, type_).As("typeSpec")
 
-	varDecl = con("var", declList(varSpec))
-	varSpec = con(identifierList, or(type_, con(opt(type_), "=", expressionList)))
+	varDecl = con("var", declList(varSpec)).As("varDecl")
+	varSpec = con(identifierList, or(type_, con(opt(type_), "=", exprList))).As("varSpec")
 
-	shortVarDecl = con(identifierList, ":=", expressionList)
+	shortVarDecl = con(identifierList, ":=", exprList).As("shortVarDecl")
 
-	functionDecl = con("func", functionName, or(function, signature))
-	functionName = identifier
-	function     = con(signature, functionBody)
-	functionBody = block
+	funcDecl = con("func", funcName, or(func_, signature)).As("funcDecl")
+	funcName = identifier
+	func_    = con(signature, funcBody).As("func_")
+	funcBody = block
 
-	methodDecl   = con("func", receiver, methodName, or(function, signature))
-	receiver     = con("(", opt(identifier), opt("*"), baseTypeName, ")")
+	methodDecl   = con("func", receiver, methodName, or(func_, signature)).As("methodDecl")
+	receiver     = con("(", opt(identifier), opt("*"), baseTypeName, ")").As("receiver")
 	baseTypeName = identifier
 
 	// block
 
-	block         = con("{", statementList, opt(statement), "}").As("block")
-	statementList = repeat(statement, ";").As("statementList")
+	block    = con("{", stmtList, opt(stmt), "}").As("block")
+	stmtList = repeat(stmt, ";").As("stmtList")
 
 	// Statements
-	statement = newRule()
-	_         = statement.Define(or(
-		declaration, labeledStmt, simpleStmt,
+	stmt = newRule().As("stmt")
+	_    = stmt.Define(or(
+		decl, labeledStmt, simpleStmt,
 		goStmt, returnStmt, breakStmt, continueStmt, gotoStmt,
 		fallthroughStmt, block, ifStmt, switchStmt, selectStmt, forStmt,
 		deferStmt))
-	simpleStmt = or(emptyStmt, expressionStmt, sendStmt, incDecStmt, assignment, shortVarDecl)
+	simpleStmt = or(emptyStmt, exprStmt, sendStmt, incDecStmt, assignment, shortVarDecl).As("simpleStmt")
 
 	emptyStmt = null
 
-	labeledStmt = con(label, ":", statement)
+	labeledStmt = con(label, ":", stmt).As("labeledStmt")
 	label       = identifier
 
-	expressionStmt = expression
+	exprStmt = expr
 
-	sendStmt = con(channel, "<-", expression)
-	channel  = expression
+	sendStmt = con(channel, "<-", expr).As("sendStmt")
+	channel  = expr
 
-	incDecStmt = con(expression, or("++", "--"))
+	incDecStmt = con(expr, or("++", "--")).As("incDecStmt")
 
-	assignment = con(expressionList, assignOp, expressionList)
-	assignOp   = con(or(addOp, mulOp).Optional(), "=")
+	assignment = con(exprList, assignOp, exprList).As("assignment")
+	assignOp   = or("=", "+=", "-=", "|=", "^=", "*=", "/=", "%=", "<<=", ">>=", "&=", "&^=").As("assignOp")
 
-	ifStmt = newRule()
-	_      = ifStmt.Define(con("if", opt(simpleStmt, ";"), expression, block, con("else", or(ifStmt, block)).Optional()))
+	ifStmt = newRule().As("ifStmt")
+	_      = ifStmt.Define(con("if", opt(simpleStmt, ";"), expr, block, opt("else", or(ifStmt, block))))
 
-	switchStmt     = or(exprSwitchStmt, typeSwitchStmt)
-	exprSwitchStmt = con("switch", opt(simpleStmt, ";"), opt(expression), "{", exprCaseClause.Repeat(), "}")
-	exprCaseClause = con(exprSwitchCase, ":", statementList)
-	exprSwitchCase = con("case", or(expressionList, "default"))
+	switchStmt     = or(exprSwitchStmt, typeSwitchStmt).As("switchStmt")
+	exprSwitchStmt = con("switch", opt(simpleStmt, ";"), opt(expr), "{", exprCaseClause.Repeat(), "}").As("exprSwitchStmt")
+	exprCaseClause = con(exprSwitchCase, ":", stmtList).As("exprCaseClause")
+	exprSwitchCase = con("case", or(exprList, "default")).As("exprSwitchCase")
 
-	typeSwitchStmt  = con("switch", opt(simpleStmt, ";"), typeSwitchGuard, "{", typeCaseClause.Repeat(), "}")
-	typeSwitchGuard = con(opt(identifier, ":="), primaryExpr, ".", "(", "type", ")")
-	typeCaseClause  = con(typeSwitchCase, ":", statementList)
-	typeSwitchCase  = or(con("case", typeList), "default")
-	typeList        = con(type_, repeat(",", type_))
+	typeSwitchStmt  = con("switch", opt(simpleStmt, ";"), typeSwitchGuard, "{", typeCaseClause.Repeat(), "}").As("typeSwitchStmt")
+	typeSwitchGuard = con(opt(identifier, ":="), primaryExpr, ".", "(", "type", ")").As("typeSwitchGuard")
+	typeCaseClause  = con(typeSwitchCase, ":", stmtList).As("typeCaseClause")
+	typeSwitchCase  = or(con("case", typeList), "default").As("typeSwitchCase")
+	typeList        = con(type_, repeat(",", type_)).As("typeList")
 
-	forStmt     = con("for", opt(or(condition, forClause, rangeClause)), block)
-	condition   = expression
-	forClause   = con(opt(initStmt), ";", opt(condition), ";", opt(postStmt))
+	forStmt     = con("for", opt(or(condition, forClause, rangeClause)), block).As("forStmt")
+	condition   = expr
+	forClause   = con(opt(initStmt), ";", opt(condition), ";", opt(postStmt)).As("forClause")
 	initStmt    = simpleStmt
 	postStmt    = simpleStmt
-	rangeClause = con(or(con(expressionList, "="), con(identifierList, ":=")), "range", expression)
+	rangeClause = con(or(con(exprList, "="), con(identifierList, ":=")), "range", expr).As("rangeClause")
 
-	goStmt = con("go", expression)
+	goStmt = con("go", expr).As("goStmt")
 
-	selectStmt = con("select", "{", repeat(commClause), "}")
-	commClause = con(commCase, ":", statementList)
-	commCase   = or(con("case", or(sendStmt, recvStmt)), "default")
-	recvStmt   = con(opt(or(con(expressionList, "="), con(identifierList, ":="))), recvExpr)
-	recvExpr   = expression
+	selectStmt = con("select", "{", repeat(commClause), "}").As("selectStmt")
+	commClause = con(commCase, ":", stmtList).As("commClause")
+	commCase   = or(con("case", or(sendStmt, recvStmt)), "default").As("commCase")
+	recvStmt   = con(opt(or(con(exprList, "="), con(identifierList, ":="))), recvExpr).As("recvStmt")
+	recvExpr   = expr
 
-	returnStmt = con("return", opt(expressionList))
+	returnStmt = con("return", opt(exprList)).As("returnStmt")
 
-	breakStmt = con("break", opt(label))
+	breakStmt = con("break", opt(label)).As("breakStmt")
 
-	continueStmt = con("continue", opt(label))
+	continueStmt = con("continue", opt(label)).As("continueStmt")
 
-	gotoStmt = con("goto", label)
+	gotoStmt = con("goto", label).As("gotoStmt")
 
 	fallthroughStmt = term("fallthrough")
 
-	deferStmt = con("defer", expression)
+	//deferStmt = con("defer", expr).As("deferStmt")
+	deferStmt = con("defer", callExpr).As("deferStmt") // restrict to callExpr
 
-	// Expression
+	// Expr
 
-	expression = newRule().As("expression")
-	_          = expression.Define(or(unaryExpr, con(expression, binaryOp, unaryExpr)))
-	unaryExpr  = newRule().As("unaryExpr")
-	_          = unaryExpr.Define(or(primaryExpr, con(unaryOp, unaryExpr)))
+	expr      = newRule().As("expr")
+	_         = expr.Define(or(unaryExpr, con(expr, binaryOp, unaryExpr)))
+	unaryExpr = newRule().As("unaryExpr")
+	_         = unaryExpr.Define(or(primaryExpr, con(unaryOp, unaryExpr)))
 
-	operand     = or(literal, operandName, methodExpr, con("(", expression, ")")).As("operand")
-	literal     = or(basicLit, compositeLit, functionLit).As("literal")
+	operand     = or(literal, operandName /*methodExpr,*/, con("(", expr, ")")).As("operand") // remove ambiguous
+	literal     = or(basicLit, compositeLit, funcLit).As("literal")
 	basicLit    = or(intLit, floatLit, imaginaryLit, runeLit, stringLit).As("basicLit")
-	operandName = or(identifier, qualifiedIdent).As("operandName")
+	operandName = identifier // remove ambiguous
+	//operandName = or(identifier, qualifiedIdent).As("operandName")
 
 	qualifiedIdent = con(packageName, ".", identifier).As("qualifiedIdent")
 
 	compositeLit = con(literalType, literalValue).As("compositeLit")
-	literalType  = or(structType, arrayType, con("[", "...", "]", elementType),
+	literalType  = or(arrayType, structType, con("[", "...", "]", elementType),
 		sliceType, mapType, typeName).As("literalType")
 	literalValue = newRule().As("literalValue")
-	_            = literalValue.Define(con("{", opt(elementList, opt(",")), "}"))
-	elementList  = con(element, repeat(",", element)).As("elementList")
+	_            = literalValue.Define(con("{", elementList, opt(element), "}"))
+	elementList  = repeat(element, ",").As("elementList")
 	element      = con(opt(key, ":"), value).As("element")
-	key          = or(fieldName, elementIndex).As("key")
-	fieldName    = identifier
-	elementIndex = expression
-	value        = or(expression, literalValue).As("value")
+	key          = expr
+	//key          = or(fieldName, elementIndex).As("key")
+	//fieldName    = identifier
+	//elementIndex = expr
+	value = or(expr, literalValue).As("value")
 
-	functionLit = con("func", function).As("functionLit")
+	funcLit = con("func", func_).As("funcLit")
 
 	primaryExpr = newRule().As("primaryExpr")
-	_           = primaryExpr.Define(or(operand, conversion, builtinCall, con(primaryExpr, selector), con(primaryExpr, index),
+	_           = primaryExpr.Define(or(
+		operand,
+		/*conversion, builtinCall,*/ // remove ambiguous
+		con(primaryExpr, selector),
+		con(primaryExpr, index),
 		con(primaryExpr, slice),
 		con(primaryExpr, typeAssertion),
-		con(primaryExpr, call)))
+		callExpr)) //callOrConversion
+	callExpr = con(primaryExpr, call)
 	selector = con(".", identifier).As("selector")
-	index    = con("[", expression, "]").As("index")
-	slice    = con("[", or(con(opt(expression), ":", opt(expression)),
-		con(opt(expression), ":", expression, ":", expression), "]")).As("slice")
+	index    = con("[", expr, "]").As("index")
+	slice    = con("[", or(con(opt(expr), ":", opt(expr)),
+		con(opt(expr), ":", expr, ":", expr), "]")).As("slice")
 	typeAssertion = con(".", "(", type_, ")").As("typeAssertion")
 	call          = con("(", opt(argumentList, opt(",")), ")").As("call")
-	argumentList  = con(expressionList, opt("...")).As("argumentList")
+	argumentList  = con(exprList, opt("...")).As("argumentList")
 
 	binaryOp = or("||", "&&", relOp, addOp, mulOp).As("binaryOp")
 	relOp    = or("==", "!=", "<", "<=", ">", ">=")
@@ -196,23 +204,24 @@ var (
 	receiverType = newRule().As("receiverType")
 	_            = receiverType.Define(or(typeName, con("(", "*", typeName, ")"), con("(", receiverType, ")")))
 
-	conversion = con(type_, "(", expression, opt(","), ")").As("conversion")
+	// remove ambiguous
+	//conversion = con(type_, "(", expr, opt(","), ")").As("conversion")
 
 	// Built-in functions
 
-	builtinCall = con(identifier, "(", opt(builtinArgs, opt(",")), ")")
-	builtinArgs = or(con(type_, opt(",", argumentList)), argumentList)
+	builtinCall = con(identifier, "(", opt(builtinArgs, opt(",")), ")").As("builtinCall")
+	builtinArgs = or(con(type_, opt(",", argumentList)), argumentList).As("builtinArgs")
 
 	// Types
 
-	type_    = newRule().As("type")
+	type_    = newRule().As("type_")
 	_        = type_.Define(or(typeName, typeLit, con("(", type_, ")")))
 	typeName = or(identifier, qualifiedIdent).As("typeName")
-	typeLit  = or(arrayType, structType, pointerType, functionType, interfaceType,
+	typeLit  = or(arrayType, structType, pointerType, funcType, interfaceType,
 		sliceType, mapType, channelType).As("typeLit")
 
 	arrayType   = con("[", arrayLength, "]", elementType).As("arrayType")
-	arrayLength = expression
+	arrayLength = expr
 	elementType = type_
 
 	sliceType = con("[", "]", elementType).As("sliceType")
@@ -225,11 +234,11 @@ var (
 	pointerType = con("*", baseType).As("pointerType")
 	baseType    = type_
 
-	functionType  = con("func", signature).As("functionType")
-	signature     = con(parameters, opt(result)).As("siginature")
+	funcType      = con("func", signature).As("funcType")
+	signature     = con(parameters, opt(result)).As("signature")
 	result        = or(parameters, type_).As("result")
-	parameters    = con("(", opt(parameterList, opt(",")), ")").As("parameters")
-	parameterList = con(parameterDecl, repeat(",", parameterDecl)).As("parameterList")
+	parameters    = con("(", parameterList, opt(parameterDecl), ")").As("parameters")
+	parameterList = repeat(parameterDecl, ",").As("parameterList")
 	parameterDecl = con(opt(identifierList), opt("..."), type_).As("parameterDecl")
 
 	interfaceType     = con("interface", "{", repeat(methodSpec, ";"), opt(methodSpec), "}").As("interfaceType")

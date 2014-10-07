@@ -88,6 +88,40 @@ func ParseFile(fset *token.FileSet, filename string, src interface{}, mode Mode)
 		return nil, err
 	}
 
+	var p parser
+	defer func() {
+		if e := recover(); e != nil {
+			_ = e.(bailout) // re-panics if it's not a bailout
+		}
+
+		// set result values
+		//if f == nil {
+		//	// source is not a valid Go source file - satisfy
+		//	// ParseFile API and return a valid (but) empty
+		//	// *ast.File
+		//	f = &ast.File{
+		//		Name:  new(ast.Ident),
+		//		Scope: ast.NewScope(nil),
+		//	}
+		//}
+
+		p.errors.Sort()
+		err = p.errors.Err()
+	}()
+
+	// parse source
+	p.init(fset, filename, text, mode)
+	f = p.parseFile()
+
+	return
+}
+func StdParseFile(fset *token.FileSet, filename string, src interface{}, mode Mode) (f *ast.File, err error) {
+	// get source
+	text, err := readSource(filename, src)
+	if err != nil {
+		return nil, err
+	}
+
 	var p std_parser
 	defer func() {
 		if e := recover(); e != nil {
@@ -144,7 +178,7 @@ func ParseDir(fset *token.FileSet, path string, filter func(os.FileInfo) bool, m
 	for _, d := range list {
 		if strings.HasSuffix(d.Name(), ".go") && (filter == nil || filter(d)) {
 			filename := filepath.Join(path, d.Name())
-			if src, err := ParseFile(fset, filename, nil, mode); err == nil {
+			if src, err := StdParseFile(fset, filename, nil, mode); err == nil {
 				name := src.Name.Name
 				pkg, found := pkgs[name]
 				if !found {
@@ -178,7 +212,7 @@ func ParseExpr(x string) (ast.Expr, error) {
 	// in case of an erroneous x.
 	p.openScope()
 	p.pkgScope = p.topScope
-	e := p.parseExpr()
+	e := p.parseExprOrType()
 	p.closeScope()
 	assert(p.topScope == nil, "unbalanced scopes")
 

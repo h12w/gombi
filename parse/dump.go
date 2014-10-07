@@ -73,9 +73,7 @@ func escape(s string) string {
 		return s
 	}
 	s = strconv.Quote(s)
-	if !strings.ContainsAny(s, " ()|") {
-		s = s[1 : len(s)-1]
-	}
+	s = s[1 : len(s)-1]
 	return s
 }
 
@@ -127,6 +125,9 @@ func (ss *stateSet) String() string {
 }
 
 func (n *Node) String() string {
+	if n == nil {
+		return "<nil Node>"
+	}
 	output := ""
 	indent := "\t"
 	n.traverse(0, func(s *state, level int) {
@@ -136,7 +137,7 @@ func (n *Node) String() string {
 }
 
 func parens(s string) string {
-	if strings.ContainsAny(s, "|") {
+	if strings.ContainsAny(s, " |") {
 		if !strings.HasPrefix(s, "(") {
 			return "(" + s + ")"
 		}
