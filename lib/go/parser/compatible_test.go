@@ -23,9 +23,9 @@ func TestCompatible(t *testing.T) {
 
 	for _, srcFile := range srcList {
 		fset := token.NewFileSet()
-		stdAst, stdErr := std.ParseFile(fset, srcFile, nil, 0)
+		stdAst, stdErr := std.ParseFile(fset, srcFile, nil, std.ParseComments)
 		fset = token.NewFileSet()
-		gomAst, gomErr := gom.ParseFile(fset, srcFile, nil, 0)
+		gomAst, gomErr := gom.ParseFile(fset, srcFile, nil, gom.ParseComments)
 		expect("parse error", gomErr).Equal(stdErr)
 		expect("decl count", len(gomAst.Decls)).Equal(len(stdAst.Decls))
 		//fmt.Println(gomAst.Decls[1].(*ast.FuncDecl).Type.Results)

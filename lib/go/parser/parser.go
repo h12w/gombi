@@ -20,10 +20,10 @@ type parser struct {
 	trace bool // == (mode & Trace != 0)
 	//indent int  // indentation used for tracing output
 
-	//// Comments
-	//comments    []*ast.CommentGroup
-	//leadComment *ast.CommentGroup // last lead comment
-	//lineComment *ast.CommentGroup // last line comment
+	// Comments
+	comments    []*ast.CommentGroup
+	leadComment *ast.CommentGroup // last lead comment
+	lineComment *ast.CommentGroup // last line comment
 
 	// Next token
 	pos token.Pos   // token position
@@ -87,6 +87,48 @@ func (p *parser) errorExpected(pos token.Pos, msg string) {
 		}
 	}
 	p.error(pos, msg)
+}
+
+// Consume a comment and return it and the line on which it ends.
+func (p *parser) consumeComment() (comment *ast.Comment, endline int) {
+	// /*-style comments may end on a different line than where they start.
+	// Scan the comment for '\n' chars and adjust endline accordingly.
+	endline = p.file.Line(p.pos)
+	if p.lit[1] == '*' {
+		// don't use range here - no need to decode Unicode code points
+		for i := 0; i < len(p.lit); i++ {
+			if p.lit[i] == '\n' {
+				endline++
+			}
+		}
+	}
+
+	comment = &ast.Comment{Slash: p.pos, Text: p.lit}
+
+	p.pos, p.tok, p.lit = p.scanner.Scan()
+
+	return
+}
+
+// Consume a group of adjacent comments, add it to the parser's
+// comments list, and return it together with the line at which
+// the last comment in the group ends. A non-comment token or n
+// empty lines terminate a comment group.
+//
+func (p *parser) consumeCommentGroup(n int) (comments *ast.CommentGroup, endline int) {
+	var list []*ast.Comment
+	endline = p.file.Line(p.pos)
+	for p.tok == token.COMMENT && p.file.Line(p.pos) <= endline+n {
+		var comment *ast.Comment
+		comment, endline = p.consumeComment()
+		list = append(list, comment)
+	}
+
+	// add comment group to the comments list
+	comments = &ast.CommentGroup{List: list}
+	p.comments = append(p.comments, comments)
+
+	return
 }
 
 // ----------------------------------------------------------------------------
@@ -247,14 +289,51 @@ func (p *parser) parseExprOrType() ast.Expr {
 
 func (p *parser) parseFile() *ast.File {
 	pp := parse.New(sourceFile)
+	skipScan := false
 	for {
-		pos, tok, str := p.scanner.Scan()
-		if r := tokenTable[tok]; r != nil {
-			if !pp.Parse(&parse.Token{ID: int(tok), Value: []byte(str), Pos: int(pos)}, r) {
+		p.leadComment = nil
+		p.lineComment = nil
+		prev := p.pos
+		if skipScan {
+			skipScan = false
+		} else {
+			p.pos, p.tok, p.lit = p.scanner.Scan()
+		}
+		if r := tokenTable[p.tok]; r != nil {
+			if !pp.Parse(&parse.Token{ID: int(p.tok), Value: []byte(p.lit), Pos: int(p.pos)}, r) {
 				break
 			}
 		}
-		if tok == token.EOF {
+		switch p.tok {
+		case token.COMMENT:
+			var comment *ast.CommentGroup
+			var endline int
+
+			if p.file.Line(p.pos) == p.file.Line(prev) {
+				// The comment is on same line as the previous token; it
+				// cannot be a lead comment but may be a line comment.
+				comment, endline = p.consumeCommentGroup(0)
+				if p.file.Line(p.pos) != endline {
+					// The next token is on a different line, thus
+					// the last comment group is a line comment.
+					p.lineComment = comment
+				}
+			}
+
+			// consume successor comments, if any
+			endline = -1
+			for p.tok == token.COMMENT {
+				comment, endline = p.consumeCommentGroup(1)
+			}
+
+			if endline+1 == p.file.Line(p.pos) {
+				// The next token is following on the line immediately after the
+				// comment group, thus the last comment group is a lead comment.
+				p.leadComment = comment
+			}
+			skipScan = true
+
+		case token.EOF:
 			break
 		}
 	}
@@ -275,11 +354,12 @@ func (p *parser) parseSourceFile(n *parse.Node) *ast.File {
 	decls := append(importDecls, p.parseTopLevelDecls(n.Child(3))...)
 	p.closeScope()
 	return &ast.File{
-		Package: pac,
-		Name:    name,
-		Decls:   decls,
-		Scope:   p.topScope,
-		Imports: importSpecs,
+		Package:  pac,
+		Name:     name,
+		Decls:    decls,
+		Scope:    p.topScope,
+		Imports:  importSpecs,
+		Comments: p.comments,
 	}
 }
 
