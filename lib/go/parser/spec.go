@@ -9,22 +9,41 @@ import (
 var (
 	builder = parse.NewBuilder()
 	term    = builder.Term
-	rule    = builder.Rule
-	recur   = builder.Recur
 	or      = builder.Or
 	con     = builder.Con
-	null    = parse.Null
 	EOF     = parse.EOF
 	newRule = parse.NewRule
-	opt     = func(rules ...interface{}) *parse.R {
-		return con(rules...).Optional()
+
+	mList = func(item *parse.R, sep string) *parse.R {
+		items := con(item, sep).AtLeast(1)
+		return or(
+			item,
+			con(item, sep),
+			con(items, item),
+			con(items, item, sep),
+		)
 	}
-	repeat = func(rules ...interface{}) *parse.R {
-		return con(rules...).Repeat()
+
+	sList = func(item *parse.R, sep string) *parse.R {
+		return or(
+			item,
+			con(item, con(sep, item).AtLeast(1)))
+	}
+
+	semiList = func(item *parse.R) *parse.R {
+		return mList(item, ";")
+	}
+
+	commaList = func(item *parse.R) *parse.R {
+		return sList(item, ",")
 	}
 
 	declList = func(item *parse.R) *parse.R {
-		return or(item, con("(", repeat(item, ";"), opt(item), ")"))
+		return or(
+			item,
+			con("(", ")"),
+			con("(", semiList(item), ")"),
+		)
 	}
 
 	identifier   = term("identifier")
@@ -39,13 +58,23 @@ var (
 
 	// Packages
 
-	sourceFile = con(packageClause, ";", repeat(importDecl, ";"), repeat(topLevelDecl, ";")).As("sourceFile")
+	sourceFile = con(packageClause, ";", or(
+		EOF,
+		con(importDecls, EOF),
+		con(topLevelDecls, EOF),
+		con(importDecls, topLevelDecls, EOF),
+	)).As("sourceFile")
+	importDecls   = con(importDecl, ";").AtLeast(1).As("importDecls")
+	topLevelDecls = con(topLevelDecl, ";").AtLeast(1).As("topLevelDecls")
 
 	packageClause = con("package", packageName).As("packageClause")
 	packageName   = identifier // As??
 
 	importDecl = con("import", declList(importSpec)).As("importDecl")
-	importSpec = con(or("dot", packageName).Optional(), importPath).As("importSpec")
+	importSpec = or(
+		importPath,
+		con(packageName, importPath),
+		con("dot", importPath)).As("importSpec")
 	importPath = stringLit
 
 	// Declarations
@@ -53,16 +82,24 @@ var (
 	decl         = or(constDecl, typeDecl, varDecl).As("decl")
 	topLevelDecl = or(decl, funcDecl, methodDecl).As("topLevelDecl")
 
-	constDecl      = con("const", declList(constSpec)).As("constDecl")
-	constSpec      = con(identifierList, opt(opt("type"), "=", exprList)).As("constSpec")
-	identifierList = con(identifier, repeat(",", identifier)).As("identifierList")
-	exprList       = con(expr, repeat(",", expr)).As("exprList")
+	constDecl = con("const", declList(constSpec)).As("constDecl")
+	valueSpec = or(
+		identifierList,
+		con(identifierList, "=", exprList),
+		con(identifierList, type_, "=", exprList),
+	).As("valueSpec")
+	constSpec      = valueSpec
+	identifierList = commaList(identifier).As("identifierList")
+	exprList       = commaList(expr).As("exprList")
 
 	typeDecl = con("type", declList(typeSpec)).As("typeDecl")
 	typeSpec = con(identifier, type_).As("typeSpec")
 
 	varDecl = con("var", declList(varSpec)).As("varDecl")
-	varSpec = con(identifierList, or(type_, con(opt(type_), "=", exprList))).As("varSpec")
+	varSpec = or(
+		valueSpec,
+		con(identifierList, type_),
+	).As("varSpec")
 
 	shortVarDecl = con(identifierList, ":=", exprList).As("shortVarDecl")
 
@@ -71,14 +108,22 @@ var (
 	func_    = con(signature, funcBody).As("func_")
 	funcBody = block
 
-	methodDecl   = con("func", receiver, methodName, or(func_, signature)).As("methodDecl")
-	receiver     = con("(", opt(identifier), opt("*"), baseTypeName, ")").As("receiver")
+	methodDecl = con("func", receiver, methodName, or(func_, signature)).As("methodDecl")
+	receiver   = con("(", or(
+		baseTypeName,
+		con(identifier, baseTypeName),
+		con("*", baseTypeName),
+		con(identifier, "*", baseTypeName),
+	), ")").As("receiver")
 	baseTypeName = identifier
 
 	// block
 
-	block    = con("{", stmtList, opt(stmt), "}").As("block")
-	stmtList = repeat(stmt, ";").As("stmtList")
+	block = or(
+		con("{", "}"),
+		con("{", semiList(stmt), "}"),
+	).As("block")
+	stmtList = con(stmt, ";").AtLeast(1).As("stmtList")
 
 	// Statements
 	stmt = newRule().As("stmt")
@@ -87,9 +132,9 @@ var (
 		goStmt, returnStmt, breakStmt, continueStmt, gotoStmt,
 		fallthroughStmt, block, ifStmt, switchStmt, selectStmt, forStmt,
 		deferStmt))
-	simpleStmt = or(emptyStmt, exprStmt, sendStmt, incDecStmt, assignment, shortVarDecl).As("simpleStmt")
+	simpleStmt = or( /*emptyStmt,*/ exprStmt, sendStmt, incDecStmt, assignment, shortVarDecl).As("simpleStmt")
 
-	emptyStmt = null
+	//emptyStmt = null
 
 	labeledStmt = con(label, ":", stmt).As("labeledStmt")
 	label       = identifier
@@ -104,40 +149,58 @@ var (
 	assignment = con(exprList, assignOp, exprList).As("assignment")
 	assignOp   = or("=", "+=", "-=", "|=", "^=", "*=", "/=", "%=", "<<=", ">>=", "&=", "&^=").As("assignOp")
 
-	ifStmt = newRule().As("ifStmt")
-	_      = ifStmt.Define(con("if", opt(simpleStmt, ";"), expr, block, opt("else", or(ifStmt, block))))
+	condition = expr
+	initCond  = or(condition, con(simpleStmt, ";", condition))
+	ifStmt    = newRule().As("ifStmt")
+	_         = ifStmt.Define(con("if",
+		initCond,
+		or(block, con(block, "else", or(ifStmt, block)))))
 
 	switchStmt     = or(exprSwitchStmt, typeSwitchStmt).As("switchStmt")
-	exprSwitchStmt = con("switch", opt(simpleStmt, ";"), opt(expr), "{", exprCaseClause.Repeat(), "}").As("exprSwitchStmt")
-	exprCaseClause = con(exprSwitchCase, ":", stmtList).As("exprCaseClause")
+	exprSwitchStmt = con("switch", or("{", con(initCond, "{")), or("}", con(exprCaseClause.AtLeast(1), "}"))).As("exprSwitchStmt")
+	commaStmtList  = or(":", con(":", stmtList))
+	exprCaseClause = con(exprSwitchCase, commaStmtList).As("exprCaseClause")
 	exprSwitchCase = con("case", or(exprList, "default")).As("exprSwitchCase")
 
-	typeSwitchStmt  = con("switch", opt(simpleStmt, ";"), typeSwitchGuard, "{", typeCaseClause.Repeat(), "}").As("typeSwitchStmt")
-	typeSwitchGuard = con(opt(identifier, ":="), primaryExpr, ".", "(", "type", ")").As("typeSwitchGuard")
-	typeCaseClause  = con(typeSwitchCase, ":", stmtList).As("typeCaseClause")
+	typeSwitchStmt  = con("switch", or(typeSwitchGuard, con(simpleStmt, ";", typeSwitchGuard)), "{", or("}", con(typeCaseClause.AtLeast(1), "}"))).As("typeSwitchStmt")
+	typeSwitchGuard = con(or(primaryExpr, con(identifier, ":=", primaryExpr)), ".", "(", "type", ")").As("typeSwitchGuard")
+	typeCaseClause  = con(typeSwitchCase, commaStmtList).As("typeCaseClause")
 	typeSwitchCase  = or(con("case", typeList), "default").As("typeSwitchCase")
-	typeList        = con(type_, repeat(",", type_)).As("typeList")
+	typeList        = commaList(type_).As("typeList")
 
-	forStmt     = con("for", opt(or(condition, forClause, rangeClause)), block).As("forStmt")
-	condition   = expr
-	forClause   = con(opt(initStmt), ";", opt(condition), ";", opt(postStmt)).As("forClause")
+	forStmt   = con("for", or(block, con(or(condition, forClause, rangeClause), block))).As("forStmt")
+	forClause = con(
+		or(";", con(initStmt, ";")),
+		or(";", con(condition, ";")),
+		or(";", con(postStmt, ";")),
+	).As("forClause")
 	initStmt    = simpleStmt
 	postStmt    = simpleStmt
 	rangeClause = con(or(con(exprList, "="), con(identifierList, ":=")), "range", expr).As("rangeClause")
 
 	goStmt = con("go", expr).As("goStmt")
 
-	selectStmt = con("select", "{", repeat(commClause), "}").As("selectStmt")
-	commClause = con(commCase, ":", stmtList).As("commClause")
+	selectStmt = con("select", or(
+		con("{", "}"),
+		con("{", commClause.AtLeast(1), "}"))).As("selectStmt")
+	commClause = con(commCase, commaStmtList).As("commClause")
 	commCase   = or(con("case", or(sendStmt, recvStmt)), "default").As("commCase")
-	recvStmt   = con(opt(or(con(exprList, "="), con(identifierList, ":="))), recvExpr).As("recvStmt")
-	recvExpr   = expr
+	recvStmt   = or(
+		recvExpr,
+		con(or(con(exprList, "="), con(identifierList, ":=")), recvExpr)).As("recvStmt")
+	recvExpr = expr
 
-	returnStmt = con("return", opt(exprList)).As("returnStmt")
+	returnStmt = or(
+		"return",
+		con("return", exprList)).As("returnStmt")
 
-	breakStmt = con("break", opt(label)).As("breakStmt")
+	breakStmt = or(
+		"break",
+		con("break", label)).As("breakStmt")
 
-	continueStmt = con("continue", opt(label)).As("continueStmt")
+	continueStmt = or(
+		"continue",
+		con("continue", label)).As("continueStmt")
 
 	gotoStmt = con("goto", label).As("gotoStmt")
 
@@ -165,10 +228,12 @@ var (
 	literalType  = or(arrayType, structType, con("[", "...", "]", elementType),
 		sliceType, mapType, typeName).As("literalType")
 	literalValue = newRule().As("literalValue")
-	_            = literalValue.Define(con("{", elementList, opt(element), "}"))
-	elementList  = repeat(element, ",").As("elementList")
-	element      = con(opt(key, ":"), value).As("element")
-	key          = expr
+	_            = literalValue.Define(or(con("{", "}"), con("{", elementList, "}")))
+	elementList  = mList(element, ",").As("elementList")
+	element      = or(
+		value,
+		con(key, ":", value)).As("element")
+	key = expr
 	//key          = or(fieldName, elementIndex).As("key")
 	//fieldName    = identifier
 	//elementIndex = expr
@@ -188,11 +253,21 @@ var (
 	callExpr = con(primaryExpr, call)
 	selector = con(".", identifier).As("selector")
 	index    = con("[", expr, "]").As("index")
-	slice    = con("[", or(con(opt(expr), ":", opt(expr)),
-		con(opt(expr), ":", expr, ":", expr), "]")).As("slice")
+	slice    = con("[", or(
+		":",
+		con(expr, ":"),
+		con(":", expr),
+		con(expr, ":", expr),
+		con(":", expr, ":", expr),
+		con(expr, ":", expr, ":", expr),
+	), "]").As("slice")
 	typeAssertion = con(".", "(", type_, ")").As("typeAssertion")
-	call          = con("(", opt(argumentList, opt(",")), ")").As("call")
-	argumentList  = con(exprList, opt("...")).As("argumentList")
+	call          = or(
+		con("(", ")"),
+		con("(", argumentList, ")"),
+		con("(", argumentList, ",", ")"),
+	).As("call")
+	argumentList = or(exprList, con(exprList, "...")).As("argumentList")
 
 	binaryOp = or("||", "&&", relOp, addOp, mulOp).As("binaryOp")
 	relOp    = or("==", "!=", "<", "<=", ">", ">=")
@@ -209,8 +284,8 @@ var (
 
 	// Built-in functions
 
-	builtinCall = con(identifier, "(", opt(builtinArgs, opt(",")), ")").As("builtinCall")
-	builtinArgs = or(con(type_, opt(",", argumentList)), argumentList).As("builtinArgs")
+	//builtinCall = con(identifier, "(", opt(builtinArgs, opt(",")), ")").As("builtinCall")
+	//builtinArgs = or(con(type_, opt(",", argumentList)), argumentList).As("builtinArgs")
 
 	// Types
 
@@ -226,30 +301,44 @@ var (
 
 	sliceType = con("[", "]", elementType).As("sliceType")
 
-	structType     = con("struct", "{", repeat(fieldDecl, ";"), opt(fieldDecl), "}").As("structType")
-	fieldDecl      = con(or(con(identifierList, type_), anonymousField), opt(tag)).As("fieldDecl")
-	anonymousField = con(term("*").Optional(), typeName).As("anonymousField")
+	structType     = con("struct", "{", semiList(fieldDecl), "}").As("structType")
+	field          = or(con(identifierList, type_), anonymousField)
+	fieldDecl      = or(field, con(field, tag)).As("fieldDecl")
+	anonymousField = or(typeName, con("*", typeName)).As("anonymousField")
 	tag            = stringLit
 
 	pointerType = con("*", baseType).As("pointerType")
 	baseType    = type_
 
-	funcType      = con("func", signature).As("funcType")
-	signature     = con(parameters, opt(result)).As("signature")
-	result        = or(parameters, type_).As("result")
-	parameters    = con("(", parameterList, opt(parameterDecl), ")").As("parameters")
-	parameterList = repeat(parameterDecl, ",").As("parameterList")
-	parameterDecl = con(opt(identifierList), opt("..."), type_).As("parameterDecl")
+	funcType   = con("func", signature).As("funcType")
+	signature  = or(parameters, con(parameters, result)).As("signature")
+	result     = or(parameters, type_).As("result")
+	parameters = or(
+		con("(", ")"),
+		con("(", parameterList, ")")).As("parameters")
+	parameterList = mList(parameterDecl, ",").As("parameterList")
+	parameterDecl = or(
+		type_,
+		con(identifierList, type_),
+		con(identifierList, "...", type_)).As("parameterDecl")
 
-	interfaceType     = con("interface", "{", repeat(methodSpec, ";"), opt(methodSpec), "}").As("interfaceType")
+	interfaceType = con("interface", or(
+		con("{", "}"),
+		con("{", methodSpecs, "}"))).As("interfaceType")
 	methodSpec        = or(con(methodName, signature), interfaceTypeName).As("methodSpec")
+	methodSpecs       = semiList(methodSpec)
 	methodName        = identifier
 	interfaceTypeName = typeName
 
 	mapType = con("map", "[", keyType, "]", elementType).As("mapType")
 	keyType = type_
 
-	channelType = con(or(con("chan", opt("<-")), con("<-", "chan")), elementType).As("channelType")
+	channelType = con(
+		or(
+			"chan",
+			con("chan", "<-"),
+			con("<-", "chan"),
+		), elementType).As("channelType")
 
 	tokenTable = toTokenTable([]interface{}{
 		//token.ILLEGAL:        ,
@@ -350,4 +439,9 @@ func toTokenTable(a []interface{}) []*parse.R {
 		}
 	}
 	return rs
+}
+
+func Init() {
+	sourceExpr.InitTermSet()
+	sourceFile.InitTermSet()
 }

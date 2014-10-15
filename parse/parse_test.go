@@ -32,21 +32,24 @@ var _ = gspec.Add(func(s gspec.S) {
 
 		given("simple arithmetic grammar", func() {
 			b := NewBuilder()
-			Term, Rule, Or, Con := b.Term, b.Rule, b.Or, b.Con
+			Term, Or, Con := b.Term, b.Or, b.Con
 			var (
 				T    = Term("T")
 				Plus = Term(`+`)
 				Mult = Term(`*`)
-				M    = Rule("M", Or(
+				M    = NewRule().As("M")
+				_    = M.Define(Or(
 					T,
-					Con(Self, Mult, T),
+					Con(M, Mult, T),
 				))
-				S = Rule("S", Or(
-					Con(Self, Plus, M),
+				S = NewRule().As("S")
+				_ = S.Define(Or(
+					Con(S, Plus, M),
 					M,
 				))
-				P = Rule("P", S)
+				P = Con(S, EOF).As("P")
 			)
+			P.InitTermSet()
 			testcase("assotitivity", func() {
 				testParse(s, P, TT{
 					tok("1", T),
@@ -94,14 +97,14 @@ var _ = gspec.Add(func(s gspec.S) {
 
 		given("a grammar with nullable rule", func() {
 			b := NewBuilder()
-			Term, Rule, Con := b.Term, b.Rule, b.Con
+			Term, Con, Or := b.Term, b.Con, b.Or
 			var (
 				A = Term("A")
 				B = Term("B")
-				X = Rule("X", B.Optional())
 				C = Term("C")
-				P = Rule("P", Con(A, X).As("AX"), C)
+				P = Con(Or(Con(A, B), A).As("AX"), C, EOF).As("P")
 			)
+			P.InitTermSet()
 
 			testcase("a sequence without the optional token", func() {
 				testParse(s, P, TT{
@@ -109,7 +112,7 @@ var _ = gspec.Add(func(s gspec.S) {
 					tok("C", C),
 				}, `
 				P ::= AX C EOF•
-					AX ::= A X•
+					AX ::= A•
 						A ::= A•
 					C ::= C•
 					EOF ::= •`,
@@ -123,52 +126,34 @@ var _ = gspec.Add(func(s gspec.S) {
 					tok("C", C),
 				}, `
 				P ::= AX C EOF•
-					AX ::= A X•
+					AX ::= A B•
 						A ::= A•
-						X ::= B•
-							B ::= B•
+						B ::= B•
 					C ::= C•
 					EOF ::= •`)
 			})
 		})
 
-		testcase("a trivial but valid nullable rule", func() {
-			b := NewBuilder()
-			Term, Rule := b.Term, b.Rule
-			var (
-				A = Term("A")
-				C = Term("C")
-				P = Rule("P", A, Null, C)
-			)
-			testParse(s, P, TT{
-				tok("A", A),
-				tok("C", C),
-			}, `
-			P ::= A Null C EOF•
-				A ::= A•
-				C ::= C•
-				EOF ::= •`)
-		})
-
 		given("a grammar with zero or more repetition", func() {
 			b := NewBuilder()
-			Term, Rule := b.Term, b.Rule
+			Term, Con, Or := b.Term, b.Con, b.Or
 			var (
 				A = Term("A")
 				B = Term("B")
-				X = Rule("X", B.Repeat())
+				X = B.AtLeast(1).As("X")
 				C = Term("C")
-				P = Rule("P", A, X, C)
+				P = Con(A, Or(C, Con(X, C)).As("XC"), EOF).As("P")
 			)
+			P.InitTermSet()
 			testcase("zero", func() {
 				testParse(s, P, TT{
 					tok("A", A),
 					tok("C", C),
 				}, `
-			P ::= A X C EOF•
+			P ::= A XC EOF•
 				A ::= A•
-				X ::= B*•
-				C ::= C•
+				XC ::= C•
+					C ::= C•
 				EOF ::= •`)
 			})
 
@@ -178,12 +163,12 @@ var _ = gspec.Add(func(s gspec.S) {
 					tok("B", B),
 					tok("C", C),
 				}, `
-			P ::= A X C EOF•
+			P ::= A XC EOF•
 				A ::= A•
-				X ::= B*•
-					B* ::= B B*•
+				XC ::= X C•
+					X ::= B•
 						B ::= B•
-				C ::= C•
+					C ::= C•
 				EOF ::= •`)
 			})
 
@@ -194,29 +179,30 @@ var _ = gspec.Add(func(s gspec.S) {
 					tok("B", B),
 					tok("C", C),
 				}, `
-			P ::= A X C EOF•
+			P ::= A XC EOF•
 				A ::= A•
-				X ::= B*•
-					B* ::= B B*•
+				XC ::= X C•
+					X ::= B X•
 						B ::= B•
-						B* ::= B B*•
+						X ::= B•
 							B ::= B•
-				C ::= C•
+					C ::= C•
 				EOF ::= •`)
 			})
 		})
 
 		given("a grammar with common prefix", func() {
 			b := NewBuilder()
-			Term, Rule, Or := b.Term, b.Rule, b.Or
+			Term, Or, Con := b.Term, b.Or, b.Con
 			var (
 				A = Term("A")
 				B = Term("B")
-				X = Rule("X", A)
-				Y = Rule("Y", A, B)
-
-				P = Rule("P", Or(X, Y).As("S"))
+				X = Con(A).As("X")
+				Y = Con(A, B).As("Y")
+				S = Or(X, Y).As("S")
+				P = Con(S, EOF).As("P")
 			)
+			P.InitTermSet()
 			testcase("short", func() {
 				testParse(s, P, TT{
 					tok("A", A),
@@ -224,7 +210,6 @@ var _ = gspec.Add(func(s gspec.S) {
 			P ::= S EOF•
 				S ::= X•
 					X ::= A•
-						A ::= A•
 				EOF ::= •`)
 			})
 			testcase("short", func() {
@@ -234,8 +219,8 @@ var _ = gspec.Add(func(s gspec.S) {
 				}, `
 			P ::= S EOF•
 				S ::= Y•
-					Y ::= A B•
-						A ::= A•
+					Y ::= X B•
+						X ::= A•
 						B ::= B•
 				EOF ::= •`)
 			})

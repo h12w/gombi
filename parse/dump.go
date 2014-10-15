@@ -9,10 +9,10 @@ import (
 
 func (r *R) Name() string {
 	if r.name == "" {
-		if r.recursive {
-			addr := fmt.Sprintf("%p", r)
-			return "<" + addr[len(addr)-4:] + ">"
-		}
+		//if r.recursive {
+		//	addr := fmt.Sprintf("%p", r)
+		//	return "<" + addr[len(addr)-4:] + ">"
+		//}
 		return parens(r.Alts.String())
 	}
 	return escape(r.name)
@@ -59,7 +59,7 @@ func (s *state) tokenValue() string {
 }
 
 func (s *state) String() string {
-	if s.rule().isTerm {
+	if s.rule().isTerm() {
 		if s.d == 0 {
 			return fmt.Sprintf("%s ::= •%v", s.name(), s.tokenValue())
 		} else if s.d == 1 {

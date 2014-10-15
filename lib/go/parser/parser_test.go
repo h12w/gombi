@@ -116,7 +116,7 @@ func TestParseExpr(t *testing.T) {
 }
 
 func TestColonEqualsScope(t *testing.T) {
-	f, err := StdParseFile(fset, "", `package p; func f() { x, y, z := x, y, z }`, 0)
+	f, err := ParseFile(fset, "", `package p; func f() { x, y, z := x, y, z }`, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +168,7 @@ var x int
 func f() { L: }
 `
 
-	f, err := ParseFile(fset, "", src, 0)
+	f, err := StdParseFile(fset, "", src, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -312,7 +312,7 @@ func TestImports(t *testing.T) {
 }
 
 func TestCommentGroups(t *testing.T) {
-	f, err := StdParseFile(fset, "", `
+	f, err := ParseFile(fset, "", `
 package p /* 1a */ /* 1b */      /* 1c */ // 1d
 /* 2a
 */

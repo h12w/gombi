@@ -29,6 +29,10 @@ func (n *Node) Child(i int) *Node {
 	return newNode(n.values[i])
 }
 
+func (n *Node) LastChild() *Node {
+	return n.Child(n.ChildCount() - 1)
+}
+
 func (n *Node) ChildCount() int {
 	return len(n.values)
 }
@@ -52,6 +56,23 @@ func (n *Node) Is(r *R) bool {
 	return n.Rule() == r
 }
 
+func (n *Node) EachItem(visit func(*Node)) {
+	if n == nil {
+		return
+	}
+	cur := n
+Loop:
+	for {
+		if cur.Alt() == cur.rule().Alts[0] {
+			visit(cur)
+			break Loop
+		} else {
+			visit(cur.Child(0))
+			cur = cur.Child(1)
+		}
+	}
+}
+
 func (n *Node) Each(visit func(*Node)) {
 	cur := n
 	for cur != nil {
@@ -71,6 +92,11 @@ func (n *Node) Get(r *R) string {
 	}
 	return string(s.token.Value)
 }
+
+func (s *state) Find(rule *R) *Node {
+	return newNode(s.find(rule))
+}
+
 func (s *state) find(rule *R) *state {
 	if s.rule() == rule {
 		return s
@@ -85,7 +111,7 @@ func (s *state) find(rule *R) *state {
 	return nil
 }
 func (s *state) leaf() *state {
-	if s.isTerm {
+	if s.isTerm() {
 		return s
 	} else if len(s.values) == 1 {
 		return s.values[0].leaf()

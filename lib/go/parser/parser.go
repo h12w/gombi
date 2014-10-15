@@ -291,8 +291,6 @@ func (p *parser) parseFile() *ast.File {
 	pp := parse.New(sourceFile)
 	skipScan := false
 	for {
-		p.leadComment = nil
-		p.lineComment = nil
 		prev := p.pos
 		if skipScan {
 			skipScan = false
@@ -304,6 +302,8 @@ func (p *parser) parseFile() *ast.File {
 				break
 			}
 		}
+		p.leadComment = nil
+		p.lineComment = nil
 		switch p.tok {
 		case token.COMMENT:
 			var comment *ast.CommentGroup
@@ -340,6 +340,8 @@ func (p *parser) parseFile() *ast.File {
 	if len(pp.Results()) != 1 {
 		if len(pp.Results()) > 1 {
 			fmt.Println("Ambiguous", len(pp.Results()))
+		} else {
+			fmt.Println("no result")
 		}
 		p.errors.Add(p.file.Position(0), "")
 		return nil
@@ -350,21 +352,21 @@ func (p *parser) parseFile() *ast.File {
 func (p *parser) parseSourceFile(n *parse.Node) *ast.File {
 	p.openScope()
 	pac, name := p.parsePackageClause(n.Child(0))
-	importDecls, importSpecs := p.parseImports(n.Child(2))
-	decls := append(importDecls, p.parseTopLevelDecls(n.Child(3))...)
+	impDecls, impSpecs := p.parseImports(n.Child(2).Find(importDecls))
+	decls := append(impDecls, p.parseTopLevelDecls(n.Child(2).Find(topLevelDecls))...)
 	p.closeScope()
 	return &ast.File{
 		Package:  pac,
 		Name:     name,
 		Decls:    decls,
 		Scope:    p.topScope,
-		Imports:  importSpecs,
+		Imports:  impSpecs,
 		Comments: p.comments,
 	}
 }
 
 func (p *parser) parseTopLevelDecls(n *parse.Node) (decls []ast.Decl) {
-	n.Each(func(item *parse.Node) {
+	n.EachItem(func(item *parse.Node) {
 		decls = append(decls, p.parseTopLevelDecl(item.Child(0)))
 	})
 	return
@@ -434,20 +436,29 @@ func declListEach(n *parse.Node, visit func(*parse.Node)) (lParen, rParen int) {
 	return 0, 0
 }
 
-func (p *parser) parseVarSpec(n *parse.Node) *ast.ValueSpec {
-	spec := ast.ValueSpec{
-		Names: p.parseIdentList(n.Child(0)),
-	}
-	def := n.Child(1).Child(0)
-	if def.Is(type_) {
-		spec.Type = p.parseType(def)
+func (p *parser) parseValueSpec(n *parse.Node) *ast.ValueSpec {
+	n = n.Child(0)
+	spec := ast.ValueSpec{}
+	if n.Is(identifierList) {
+		spec.Names = p.parseIdentList(n)
 	} else {
-		if def.Child(0) != nil {
-			spec.Type = p.parseType(def.Child(0).Child(0))
+		spec.Names = p.parseIdentList(n.Child(0))
+		if n.Child(1).Is(type_) {
+			spec.Type = p.parseType(n.Child(1))
 		}
-		spec.Values = p.parseExprList(def.Child(2))
+		spec.Values = p.parseExprList(n.LastChild())
 	}
 	return &spec
+}
+
+func (p *parser) parseVarSpec(n *parse.Node) *ast.ValueSpec {
+	if n.Is(valueSpec) {
+		return p.parseValueSpec(n)
+	}
+	return &ast.ValueSpec{
+		Names: p.parseIdentList(n.Child(0)),
+		Type:  p.parseType(n.Child(1)),
+	}
 }
 
 func (p *parser) parseMethodDecl(n *parse.Node) ast.Decl {
@@ -466,10 +477,13 @@ func (p *parser) parseGoStmt(n *parse.Node) ast.Stmt {
 }
 
 func (p *parser) parseReturnStmt(n *parse.Node) ast.Stmt {
-	return &ast.ReturnStmt{
-		Return:  token.Pos(n.Child(0).Pos()),
-		Results: p.parseExprList(n.Child(1).Child(0)),
+	ret := ast.ReturnStmt{
+		Return: token.Pos(n.Child(0).Pos()),
 	}
+	if n.ChildCount() > 1 {
+		ret.Results = p.parseExprList(n.Child(1))
+	}
+	return &ret
 }
 
 func (p *parser) parseBreakStmt(n *parse.Node) ast.Stmt {
@@ -553,48 +567,67 @@ func (p *parser) parseBody(n *parse.Node, scope *ast.Scope) *ast.BlockStmt {
 }
 
 func (p *parser) parseSignature(n *parse.Node, scope *ast.Scope) *ast.FuncType {
-	return &ast.FuncType{
-		Params:  p.parseParams(n.Child(0), scope),
-		Results: p.parseResults(n.Child(1), scope),
+	funcType := ast.FuncType{
+		Params: p.parseParams(n.Child(0), scope),
 	}
+	if n.ChildCount() > 1 {
+		funcType.Results = p.parseResults(n.Child(1), scope)
+	}
+	return &funcType
 }
 
 func (p *parser) parseParams(n *parse.Node, scope *ast.Scope) *ast.FieldList {
 	fieldList := ast.FieldList{
 		Opening: token.Pos(n.Child(0).Pos()),
-		Closing: token.Pos(n.Child(3).Pos()),
+		Closing: token.Pos(n.LastChild().Pos()),
 	}
-	n.Child(1).Each(func(item *parse.Node) {
-		fieldList.List = append(fieldList.List, p.parseParamDecl(item.Child(0), scope))
-	})
-	if n.Child(2).Child(0) != nil {
-		fieldList.List = append(fieldList.List, p.parseParamDecl(n.Child(2).Child(0), scope))
+	if n.Child(1).Is(parameterList) {
+		eachListItem(parameterDecl, n.Child(1), func(item *parse.Node) {
+			fieldList.List = append(fieldList.List, p.parseParamDecl(item, scope))
+		})
 	}
 	return &fieldList
 }
 
 func (p *parser) parseParamDecl(n *parse.Node, scope *ast.Scope) *ast.Field {
-	idents := p.parseIdentList(n.Child(0).Child(0))
-	typ := p.parseType(n.Child(2))
-	field := ast.Field{
-		Names: idents,
-		Type:  typ,
+	field := ast.Field{}
+	if n.Child(0).Is(type_) {
+		field.Type = p.parseType(n.Child(0))
+	} else {
+		field.Names = p.parseIdentList(n.Child(0))
+		if n.Child(1).Is(type_) {
+			field.Type = p.parseType(n.Child(1))
+		} else {
+			// TODO ...
+			field.Type = p.parseType(n.Child(2))
+		}
 	}
-	p.declare(field, nil, scope, ast.Var, idents...)
-	p.resolve(typ)
+	p.declare(field, nil, scope, ast.Var, field.Names...)
+	if field.Type != nil {
+		p.resolve(field.Type)
+	}
 	return &field
 }
 
+func eachInlineListItem(n *parse.Node, visit func(*parse.Node)) {
+	visit(n.Child(0))
+	if n.ChildCount() > 1 {
+		n.Child(1).EachItem(func(item *parse.Node) {
+			visit(item.Child(1))
+		})
+	}
+	return
+}
+
 func (p *parser) parseIdentList(n *parse.Node) (idents []*ast.Ident) {
-	idents = append(idents, p.parseIdent(n.Child(0)))
-	n.Child(1).Each(func(item *parse.Node) {
-		idents = append(idents, p.parseIdent(item.Child(1)))
+	eachInlineListItem(n, func(item *parse.Node) {
+		idents = append(idents, p.parseIdent(item))
 	})
 	return
 }
 
 func (p *parser) parseResults(n *parse.Node, scope *ast.Scope) *ast.FieldList {
-	n = n.Child(0).Child(0)
+	n = n.Child(0)
 	switch n.Rule() {
 	case parameters:
 		return p.parseParams(n, scope)
@@ -611,17 +644,25 @@ func (p *parser) parseBlockStmt(n *parse.Node) *ast.BlockStmt {
 	return block
 }
 
+func eachListItem(itemRule *parse.R, n *parse.Node, visit func(*parse.Node)) {
+	if n.Child(0).Is(itemRule) {
+		visit(n.Child(0))
+		return
+	}
+	n.Child(0).EachItem(func(item *parse.Node) {
+		visit(item.Child(0))
+	})
+	visit(n.Child(1))
+}
+
 func (p *parser) parseBlock(n *parse.Node, scope *ast.Scope) *ast.BlockStmt {
 	block := ast.BlockStmt{
 		Lbrace: token.Pos(n.Child(0).Pos()),
-		Rbrace: token.Pos(n.Child(3).Pos()),
+		Rbrace: token.Pos(n.LastChild().Pos()),
 	}
-	n.Child(1).Each(func(item *parse.Node) {
-		block.List = append(block.List, p.parseStmt(item.Child(0)))
-	})
-	if item := n.Child(2).Child(0); item != nil {
+	eachListItem(stmt, n.Child(1), func(item *parse.Node) {
 		block.List = append(block.List, p.parseStmt(item))
-	}
+	})
 	return &block
 }
 
@@ -668,22 +709,34 @@ func (p *parser) parseDeclStmt(n *parse.Node) ast.Stmt {
 
 func (p *parser) parseIfStmt(n *parse.Node) ast.Stmt {
 	p.openScope()
-	ifStmt := &ast.IfStmt{
-		If:   token.Pos(n.Child(0).Pos()),
-		Init: p.parseInit(n.Child(1)),
-		Cond: p.parseCond(n.Child(2)),
-		Body: p.parseBlock(n.Child(3), p.topScope),
-		Else: p.parseElse(n.Child(4)),
+	ifStmt := ast.IfStmt{
+		If: token.Pos(n.Child(0).Pos()),
+	}
+	ifStmt.Init, ifStmt.Cond = p.parseInitCond(n.Child(1))
+	if blockElse := n.Child(2).Child(0); blockElse.Is(block) {
+		ifStmt.Body = p.parseBlock(blockElse, p.topScope)
+	} else {
+		ifStmt.Body = p.parseBlock(blockElse.Child(1).Child(0), p.topScope)
+		ifStmt.Else = p.parseElse(blockElse.Child(1).Child(2))
 	}
 	p.closeScope()
-	return ifStmt
+	return &ifStmt
+}
+
+func (p *parser) parseInitCond(n *parse.Node) (ast.Stmt, ast.Expr) {
+	n = n.Child(0)
+	if n.Is(expr) {
+		return nil, p.parseCond(n)
+	} else {
+		return p.parseInit(n.Child(0)), p.parseCond(n.Child(2))
+	}
 }
 
 func (p *parser) parseElse(n *parse.Node) ast.Stmt {
 	if n == nil {
 		return nil
 	}
-	n = n.Child(1).Child(0)
+	n = n.Child(0)
 	switch n.Rule() {
 	case ifStmt:
 		return p.parseIfStmt(n)
@@ -696,19 +749,20 @@ func (p *parser) parseElse(n *parse.Node) ast.Stmt {
 func (p *parser) parseForStmt(n *parse.Node) (r ast.Stmt) {
 	p.openScope()
 	forPos := token.Pos(n.Child(0).Pos())
-	option := n.Child(1).Child(0).Child(0)
-	body := p.parseBlock(n.Child(2), p.topScope)
+	n = n.Child(1)
+	if n.Is(block) {
+		return &ast.ForStmt{
+			For:  forPos,
+			Body: p.parseBlock(n, p.topScope),
+		}
+	}
+	option := n.Child(0).Child(0)
+	body := p.parseBlock(n.Child(1), p.topScope)
 	switch option.Rule() {
 	case condition:
 		fmt.Println(option)
 	case forClause:
 		fmt.Println(option)
-		r = &ast.ForStmt{
-			For:  token.Pos(n.Child(0).Pos()),
-			Init: p.parseInit(n.Child(1)),
-			Cond: p.parseCond(n.Child(1)),
-			Post: p.parsePost(n.Child(1)),
-		}
 	case rangeClause:
 		forStmt := p.parseRangeStmt(option)
 		forStmt.For, forStmt.Body = forPos, body
@@ -817,9 +871,11 @@ func (p *parser) parseShortVarDecl(n *parse.Node) ast.Stmt {
 }
 
 func (p *parser) parseExprList(n *parse.Node) (exprs []ast.Expr) {
-	exprs = append(exprs, p.parseExpr(n.Child(0)))
-	n.Child(1).Each(func(item *parse.Node) {
-		exprs = append(exprs, p.parseExpr(item.Child(1)))
+	if n == nil {
+		return
+	}
+	eachInlineListItem(n, func(item *parse.Node) {
+		exprs = append(exprs, p.parseExpr(item))
 	})
 	return
 }
@@ -833,7 +889,7 @@ func (p *parser) parsePackageClause(n *parse.Node) (token.Pos, *ast.Ident) {
 }
 
 func (p *parser) parseImports(n *parse.Node) (decls []ast.Decl, specs []*ast.ImportSpec) {
-	n.Each(func(item *parse.Node) {
+	n.EachItem(func(item *parse.Node) {
 		decl, ss := p.parseImportDecl(item.Child(0))
 		decls = append(decls, decl)
 		specs = append(specs, ss...)
@@ -845,29 +901,32 @@ func (p *parser) parseImportDecl(n *parse.Node) (decl *ast.GenDecl, specs []*ast
 	decl = &ast.GenDecl{
 		TokPos: token.Pos(n.Child(0).Pos()),
 		Tok:    token.IMPORT,
-		Lparen: token.Pos(n.Child(1).Child(0).Pos()),
-		Rparen: token.Pos(n.Child(1).Child(3).Pos()),
 	}
 	n = n.Child(1)
-	if n.Child(0).Is(importSpec) {
-		spec := p.parseImportSpec(n.Child(0))
+	if n.Is(importSpec) {
+		spec := p.parseImportSpec(n)
 		specs = append(specs, spec)
 		decl.Specs = append(decl.Specs, spec)
 		return
 	}
-	n = n.Child(1) // skip (
-	n.Each(func(item *parse.Node) {
-		spec := p.parseImportSpec(item.Child(0))
-		specs = append(specs, spec)
-		decl.Specs = append(decl.Specs, spec)
-	})
+	decl.Lparen = token.Pos(n.Child(0).Pos())
+	decl.Rparen = token.Pos(n.LastChild().Pos())
+	if n.ChildCount() == 3 {
+		eachListItem(importSpec, n.Child(1), func(item *parse.Node) {
+			spec := p.parseImportSpec(item)
+			specs = append(specs, spec)
+			decl.Specs = append(decl.Specs, spec)
+		})
+	}
 	return
 }
 
 func (p *parser) parseImportSpec(n *parse.Node) *ast.ImportSpec {
 	spec := ast.ImportSpec{}
-	if name := n.Child(0); name != nil {
-		name = name.Child(0).Child(0)
+	if n.Child(0).Is(importPath) {
+		spec.Path = p.parseBasicLit(n.Child(0))
+	} else {
+		name := n.Child(0)
 		switch name.Rule() {
 		case identifier:
 			spec.Name = p.parseIdent(name)
@@ -877,8 +936,9 @@ func (p *parser) parseImportSpec(n *parse.Node) *ast.ImportSpec {
 				Name:    ".",
 			}
 		}
+		spec.Path = p.parseBasicLit(n.Child(1))
+
 	}
-	spec.Path = p.parseBasicLit(n.Child(1))
 	return &spec
 }
 
@@ -909,6 +969,9 @@ func (p *parser) parseGoExpr(n *parse.Node) ast.Expr {
 }
 
 func (p *parser) parseExpr(n *parse.Node) ast.Expr {
+	if n == nil {
+		return nil // ??
+	}
 	switch n.ChildCount() {
 	case 1:
 		return p.parseUnaryExpr(n.Child(0))
@@ -972,22 +1035,23 @@ func (p *parser) parseSelector(n *parse.Node) ast.Expr {
 
 func (p *parser) parseCallExpr(n *parse.Node) *ast.CallExpr {
 	call := n.Child(1)
-	argList := call.Child(1)
-	return &ast.CallExpr{
-		Fun:      p.parsePrimaryExpr(n.Child(0)),
-		Lparen:   token.Pos(call.Child(0).Pos()),
-		Args:     p.parseArgs(argList.Child(0)),
-		Ellipsis: token.Pos(argList.Child(1).Pos()),
-		Rparen:   token.Pos(call.Child(2).Pos()),
+	callExpr := ast.CallExpr{
+		Fun:    p.parsePrimaryExpr(n.Child(0)),
+		Lparen: token.Pos(call.Child(0).Pos()),
+		Rparen: token.Pos(call.LastChild().Pos()),
 	}
+	if call.ChildCount() > 2 {
+		callExpr.Args, callExpr.Ellipsis = p.parseArgs(call.Child(1))
+	}
+	return &callExpr
 }
 
-func (p *parser) parseArgs(n *parse.Node) []ast.Expr {
+func (p *parser) parseArgs(n *parse.Node) ([]ast.Expr, token.Pos) {
 	n = n.Child(0)
-	if n == nil {
-		return nil
+	if n.Is(exprList) {
+		return p.parseExprList(n), 0
 	}
-	return p.parseExprList(n)
+	return p.parseExprList(n.Child(0)), token.Pos(n.Child(1).Pos())
 }
 
 func (p *parser) parseOperand(n *parse.Node) ast.Expr {
@@ -1022,7 +1086,7 @@ func (p *parser) parseCompositeLit(n *parse.Node) ast.Expr {
 		Type:   p.parseLiteralType(n.Child(0)),
 		Lbrace: token.Pos(litValue.Child(0).Pos()),
 		Elts:   p.parseLiteralValue(litValue),
-		Rbrace: token.Pos(litValue.Child(3).Pos()),
+		Rbrace: token.Pos(litValue.LastChild().Pos()),
 	}
 }
 
@@ -1052,27 +1116,27 @@ func (p *parser) parseSliceType(n *parse.Node) ast.Expr {
 }
 
 func (p *parser) parseLiteralValue(n *parse.Node) (exprs []ast.Expr) {
-	n.Child(1).Each(func(item *parse.Node) {
-		exprs = append(exprs, p.parseElement(item.Child(0)))
-	})
-	if n.Child(2) != nil {
-		exprs = append(exprs, p.parseElement(n.Child(2).Child(0)))
+	if n.ChildCount() == 3 {
+		eachListItem(element, n.Child(1), func(item *parse.Node) {
+			exprs = append(exprs, p.parseElement(item))
+		})
 	}
 	return
 }
 
 func (p *parser) parseElement(n *parse.Node) ast.Expr {
-	if n.Child(0) == nil {
-		return p.parseValue(n.Child(1))
+	n = n.Child(0)
+	if n.Is(value) {
+		return p.parseValue(n)
 	}
 	return p.parseKeyValue(n)
 }
 
 func (p *parser) parseKeyValue(n *parse.Node) *ast.KeyValueExpr {
 	return &ast.KeyValueExpr{
-		Key:   p.parseExpr(n.Child(0).Child(0)),
-		Colon: token.Pos(n.Child(0).Child(1).Pos()),
-		Value: p.parseValue(n.Child(1)),
+		Key:   p.parseExpr(n.Child(0)),
+		Colon: token.Pos(n.Child(1).Pos()),
+		Value: p.parseValue(n.Child(2)),
 	}
 }
 
@@ -1144,18 +1208,19 @@ func (p *parser) parseTypeLit(n *parse.Node) ast.Expr {
 }
 
 func (p *parser) parseInterfaceType(n *parse.Node) ast.Expr {
+	keywordPos := token.Pos(n.Child(0).Pos())
+	n = n.Child(1)
 	specs := ast.FieldList{
-		Opening: token.Pos(n.Child(1).Pos()),
-		Closing: token.Pos(n.Child(4).Pos()),
+		Opening: token.Pos(n.Child(0).Pos()),
+		Closing: token.Pos(n.LastChild().Pos()),
 	}
-	n.Child(2).Each(func(item *parse.Node) {
-		specs.List = append(specs.List, p.parseMethodSpec(item.Child(0)))
-	})
-	if n.Child(3) != nil {
-		specs.List = append(specs.List, p.parseMethodSpec(n.Child(3).Child(0)))
+	if n.ChildCount() > 2 {
+		eachListItem(methodSpec, n.Child(1), func(item *parse.Node) {
+			specs.List = append(specs.List, p.parseMethodSpec(item))
+		})
 	}
 	return &ast.InterfaceType{
-		Interface: token.Pos(n.Child(0).Pos()),
+		Interface: keywordPos,
 		Methods:   &specs,
 	}
 }

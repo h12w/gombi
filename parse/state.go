@@ -38,15 +38,8 @@ func (s *state) step() *state {
 	return s
 }
 
-func (s *state) nextChildRule() *R {
-	if s.Alt.Rules[s.d] == Null {
-		s.step() // skip trivial null rule
-	}
-	return s.Alt.Rules[s.d]
-}
-
 func (s *state) complete() bool {
-	if s.isTerm {
+	if s.isTerm() {
 		return s.d == 1
 	}
 	return s.d == len(s.Alt.Rules)
@@ -55,24 +48,24 @@ func (s *state) complete() bool {
 func (s *state) scan(t *Token) {
 	// not copied because a terminal state can never be a parent of multiple children
 	s.token = t
-	s.step()
+	s.d++
 }
 
 func (s *state) advance(t *state) *state {
 	// copied because multiple alternatives shares the same parent
-	ns := s.copy()
-	ns.values[s.d] = t
-	return ns.step()
+	s = s.copy()
+	s.values[s.d] = t
+	return s.step()
 }
 
 type stateSet struct {
-	termRule  *R
+	termAlt   *Alt
 	termState *state
 	m         map[*Alt]*state
 }
 
-func newStateSet(tr *R) stateSet {
-	return stateSet{termRule: tr, m: make(map[*Alt]*state)}
+func newStateSet(ta *Alt) stateSet {
+	return stateSet{termAlt: ta, m: make(map[*Alt]*state)}
 }
 
 func (ss *stateSet) add(alt *Alt, parent *state) (child *state, isNew bool) {
@@ -83,7 +76,7 @@ func (ss *stateSet) add(alt *Alt, parent *state) (child *state, isNew bool) {
 		ss.m[alt] = child
 		isNew = true
 	}
-	if child.rule() == ss.termRule {
+	if child.Alt == ss.termAlt {
 		ss.termState = child
 	}
 	// parent != nil
