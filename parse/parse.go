@@ -76,15 +76,11 @@ func (pset *stateSet) predictNext(s *state) {
 	if s.isTerm() {
 		return
 	}
-	nextRule := s.Rules[s.d]
-	for _, alt := range nextRule.Alts {
-		//if alt.termSet[pset.termAlt] || alt == pset.termAlt {
-		if child, isNew := pset.add(alt, s); isNew {
-			pset.predictNext(child)
+	for _, alt := range s.Rules[s.d].Alts {
+		if alt.termSet[pset.termAlt] {
+			if child, isNew := pset.add(alt, s); isNew {
+				pset.predictNext(child)
+			}
 		}
-		//}
 	}
-	//if nextRule.nullable {
-	//	pset.predict(s.advance(nil))
-	//}
 }

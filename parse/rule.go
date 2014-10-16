@@ -22,7 +22,6 @@ type (
 	R struct {
 		name string
 		Alts
-		nullable bool
 	}
 	Alt struct {
 		*R
@@ -59,17 +58,13 @@ func (a *Alt) initTermSet(m map[*Alt]bool) altSet {
 		return a.termSet
 	}
 	m[a] = true
-	a.termSet = make(altSet)
+	if a.termSet == nil {
+		a.termSet = make(altSet)
+	}
 	if len(a.Rules) > 0 {
 		a.Rules[0].eachAlt(func(alt *Alt) {
-			if alt.isTerm() {
-				a.termSet[alt] = true
-				//fmt.Printf("add term %s to %s\n", alt.name, a.R)
-			} else {
-				for aa := range alt.initTermSet(m) {
-					a.termSet[aa] = true
-					//fmt.Printf("add term %s to %s\n", aa.name, a.R)
-				}
+			for aa := range alt.initTermSet(m) {
+				a.termSet[aa] = true
 			}
 		})
 	}
@@ -82,12 +77,32 @@ func (a *Alt) initTermSet(m map[*Alt]bool) altSet {
 }
 
 func newAlt(parent *R, rules Rules) *Alt {
-	return &Alt{parent, rules, nil}
+	alt := &Alt{parent, rules, make(altSet)}
+	if len(rules) > 0 {
+		if len(rules[0].Alts) == 1 {
+			alt.termSet = rules[0].Alts[0].termSet
+		}
+	}
+	//alt := &Alt{parent, rules, make(altSet)}
+	//alt.initTermSet()
+	return alt
 }
+
+//func (a *Alt) initTermSet() {
+//	if len(a.Rules) > 0 {
+//		for _, alt := range a.Rules[0].Alts {
+//			for t := range alt.termSet {
+//				a.termSet[t] = true
+//			}
+//		}
+//	}
+//}
 
 func newTerm() *R {
 	r := &R{}
-	r.Alts = Alts{newAlt(r, nil)}
+	alt := newAlt(r, nil)
+	alt.termSet = map[*Alt]bool{alt: true}
+	r.Alts = Alts{alt}
 	return r
 }
 
@@ -128,8 +143,8 @@ func (r *R) Define(o *R) *R {
 	r.Alts = o.Alts
 	for i := range r.Alts {
 		r.Alts[i].R = r
+		//r.Alts[i].initTermSet()
 	}
-	r.nullable = o.nullable
 	return r
 }
 
@@ -171,13 +186,6 @@ func (r *R) As(name string) *R {
 	r.name = name
 	return r
 }
-
-//func (r *R) Optional() *R {
-//	x := NewRule()
-//	x.nullable = true
-//	x.Alts = Alts{r.toAlt(x)}
-//	return x
-//}
 
 func (r *R) AtLeast(n int) *R {
 	if n == 1 {
@@ -228,7 +236,6 @@ func (r *R) oneOrMore() *R {
 func (r *R) zeroOrMore() *R {
 	x := NewRule()
 	x.Define(con(r, x))
-	x.nullable = true
 	x.As(parens(r.Name()) + "*")
 	return x
 }

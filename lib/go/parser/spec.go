@@ -441,7 +441,7 @@ func toTokenTable(a []interface{}) []*parse.R {
 	return rs
 }
 
-func Init() {
+func init() {
 	sourceExpr.InitTermSet()
 	sourceFile.InitTermSet()
 }
