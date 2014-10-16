@@ -58,34 +58,31 @@ func (a *Alt) initTermSet(m map[*Alt]bool) altSet {
 		return a.termSet
 	}
 	m[a] = true
-	if a.termSet == nil {
-		a.termSet = make(altSet)
-	}
 	if len(a.Rules) > 0 {
-		a.Rules[0].eachAlt(func(alt *Alt) {
-			for aa := range alt.initTermSet(m) {
-				a.termSet[aa] = true
-			}
-		})
-	}
-	for i := 1; i < len(a.Rules); i++ {
-		a.Rules[i].eachAlt(func(alt *Alt) {
-			alt.initTermSet(m)
-		})
+		r0 := a.Rules[0]
+		if len(r0.Alts) == 1 {
+			a.termSet = r0.Alts[0].initTermSet(m)
+		} else {
+			r0.eachAlt(func(alt *Alt) {
+				for aa := range alt.initTermSet(m) {
+					a.termSet[aa] = true
+				}
+			})
+		}
+		for i := 1; i < len(a.Rules); i++ {
+			a.Rules[i].eachAlt(func(alt *Alt) {
+				alt.initTermSet(m)
+			})
+		}
 	}
 	return a.termSet
 }
 
 func newAlt(parent *R, rules Rules) *Alt {
-	alt := &Alt{parent, rules, make(altSet)}
-	if len(rules) > 0 {
-		if len(rules[0].Alts) == 1 {
-			alt.termSet = rules[0].Alts[0].termSet
-		}
-	}
+	a := &Alt{parent, rules, make(altSet)}
 	//alt := &Alt{parent, rules, make(altSet)}
 	//alt.initTermSet()
-	return alt
+	return a
 }
 
 //func (a *Alt) initTermSet() {
