@@ -1,32 +1,38 @@
 package parse
 
 type Node struct {
-	*state
+	alt    *Alt
+	token  *Token
+	values []*Node
+}
+type Token struct {
+	ID    int
+	Value []byte
+	Pos   int
 }
 
-func newNode(s *state) *Node {
-	if s == nil {
+func (n *Node) copy() *Node {
+	if n == nil {
 		return nil
 	}
-	return &Node{s}
-}
-
-func (n *Node) Alt() *Alt {
-	return n.state.Alt
+	node := *n
+	n = &node
+	n.values = append([]*Node(nil), n.values...)
+	return n
 }
 
 func (n *Node) Rule() *R {
 	if n == nil {
 		return nil
 	}
-	return n.state.Alt.R
+	return n.alt.R
 }
 
 func (n *Node) Child(i int) *Node {
 	if n == nil {
 		return nil
 	}
-	return newNode(n.values[i])
+	return n.values[i]
 }
 
 func (n *Node) LastChild() *Node {
@@ -63,7 +69,7 @@ func (n *Node) EachItem(visit func(*Node)) {
 	cur := n
 Loop:
 	for {
-		if cur.Alt() == cur.rule().Alts[0] {
+		if cur.alt == cur.alt.R.Alts[0] {
 			visit(cur)
 			break Loop
 		} else {
@@ -93,12 +99,12 @@ func (n *Node) Get(r *R) string {
 	return string(s.token.Value)
 }
 
-func (s *state) Find(rule *R) *Node {
-	return newNode(s.find(rule))
+func (s *Node) Find(rule *R) *Node {
+	return s.find(rule)
 }
 
-func (s *state) find(rule *R) *state {
-	if s.rule() == rule {
+func (s *Node) find(rule *R) *Node {
+	if s.alt.R == rule {
 		return s
 	}
 	for _, child := range s.values {
@@ -110,8 +116,8 @@ func (s *state) find(rule *R) *state {
 	}
 	return nil
 }
-func (s *state) leaf() *state {
-	if s.isTerm() {
+func (s *Node) leaf() *Node {
+	if s.alt.R.isTerm() {
 		return s
 	} else if len(s.values) == 1 {
 		return s.values[0].leaf()

@@ -58,19 +58,19 @@ var _ = gspec.Add(func(s gspec.S) {
 					tok("+", Plus),
 					tok("3", T),
 				}, `
-			P ::= S EOF•
-				S ::= S + M•
-					S ::= S + M•
-						S ::= M•
-							M ::= T•
-								T ::= 1•
-						+ ::= +•
-						M ::= T•
-							T ::= 2•
-					+ ::= +•
-					M ::= T•
-						T ::= 3•
-				EOF ::= •`)
+			P ::= S EOF
+				S ::= S + M
+					S ::= S + M
+						S ::= M
+							M ::= T
+								T ::= 1
+						+ ::= +
+						M ::= T
+							T ::= 2
+					+ ::= +
+					M ::= T
+						T ::= 3
+				EOF ::= `)
 			})
 			testcase("precedence", func() {
 				testParse(s, P, TT{
@@ -80,18 +80,18 @@ var _ = gspec.Add(func(s gspec.S) {
 					tok("*", Mult),
 					tok("4", T),
 				}, `
-			P ::= S EOF•
-				S ::= S + M•
-					S ::= M•
-						M ::= T•
-							T ::= 2•
-					+ ::= +•
-					M ::= M * T•
-						M ::= T•
-							T ::= 3•
-						* ::= *•
-						T ::= 4•
-				EOF ::= •`)
+			P ::= S EOF
+				S ::= S + M
+					S ::= M
+						M ::= T
+							T ::= 2
+					+ ::= +
+					M ::= M * T
+						M ::= T
+							T ::= 3
+						* ::= *
+						T ::= 4
+				EOF ::= `)
 			})
 		})
 
@@ -111,11 +111,11 @@ var _ = gspec.Add(func(s gspec.S) {
 					tok("A", A),
 					tok("C", C),
 				}, `
-				P ::= AX C EOF•
-					AX ::= A•
-						A ::= A•
-					C ::= C•
-					EOF ::= •`,
+				P ::= AX C EOF
+					AX ::= A
+						A ::= A
+					C ::= C
+					EOF ::= `,
 				)
 			})
 
@@ -125,12 +125,12 @@ var _ = gspec.Add(func(s gspec.S) {
 					tok("B", B),
 					tok("C", C),
 				}, `
-				P ::= AX C EOF•
-					AX ::= A B•
-						A ::= A•
-						B ::= B•
-					C ::= C•
-					EOF ::= •`)
+				P ::= AX C EOF
+					AX ::= A B
+						A ::= A
+						B ::= B
+					C ::= C
+					EOF ::= `)
 			})
 		})
 
@@ -150,11 +150,11 @@ var _ = gspec.Add(func(s gspec.S) {
 					tok("A", A),
 					tok("C", C),
 				}, `
-			P ::= A XC EOF•
-				A ::= A•
-				XC ::= C•
-					C ::= C•
-				EOF ::= •`)
+			P ::= A XC EOF
+				A ::= A
+				XC ::= C
+					C ::= C
+				EOF ::= `)
 			})
 
 			testcase("one", func() {
@@ -163,13 +163,13 @@ var _ = gspec.Add(func(s gspec.S) {
 					tok("B", B),
 					tok("C", C),
 				}, `
-			P ::= A XC EOF•
-				A ::= A•
-				XC ::= X C•
-					X ::= B•
-						B ::= B•
-					C ::= C•
-				EOF ::= •`)
+			P ::= A XC EOF
+				A ::= A
+				XC ::= X C
+					X ::= B
+						B ::= B
+					C ::= C
+				EOF ::= `)
 			})
 
 			testcase("two", func() {
@@ -179,15 +179,15 @@ var _ = gspec.Add(func(s gspec.S) {
 					tok("B", B),
 					tok("C", C),
 				}, `
-			P ::= A XC EOF•
-				A ::= A•
-				XC ::= X C•
-					X ::= B X•
-						B ::= B•
-						X ::= B•
-							B ::= B•
-					C ::= C•
-				EOF ::= •`)
+			P ::= A XC EOF
+				A ::= A
+				XC ::= X C
+					X ::= B X
+						B ::= B
+						X ::= B
+							B ::= B
+					C ::= C
+				EOF ::= `)
 			})
 		})
 
@@ -207,22 +207,22 @@ var _ = gspec.Add(func(s gspec.S) {
 				testParse(s, P, TT{
 					tok("A", A),
 				}, `
-			P ::= S EOF•
-				S ::= X•
-					X ::= A•
-				EOF ::= •`)
+			P ::= S EOF
+				S ::= X
+					X ::= A
+				EOF ::= `)
 			})
 			testcase("short", func() {
 				testParse(s, P, TT{
 					tok("A", A),
 					tok("B", B),
 				}, `
-			P ::= S EOF•
-				S ::= Y•
-					Y ::= X B•
-						X ::= A•
-						B ::= B•
-				EOF ::= •`)
+			P ::= S EOF
+				S ::= Y
+					Y ::= X B
+						X ::= A
+						B ::= B
+				EOF ::= `)
 			})
 
 		})

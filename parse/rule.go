@@ -230,28 +230,10 @@ func (r *R) oneOrMore() *R {
 	return x
 }
 
-func (r *R) zeroOrMore() *R {
-	x := NewRule()
-	x.Define(con(r, x))
-	x.As(parens(r.Name()) + "*")
-	return x
-}
-
-func (r *R) isEOF() bool {
-	return r == EOF
-}
-
 func (r *R) eachAlt(visit func(a *Alt)) {
 	for _, a := range r.Alts {
 		visit(a)
 	}
-}
-
-func (a *Alt) last() *R {
-	if len(a.Rules) > 0 {
-		return a.Rules[len(a.Rules)-1]
-	}
-	return nil
 }
 
 func (a *Alt) rule() *R {

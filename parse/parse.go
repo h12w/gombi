@@ -19,9 +19,9 @@ func (p *Parser) Reset() {
 func (p *Parser) Parse(t *Token, tr *R) bool {
 	pset := newStateSet(tr.Alts[0])
 	if p.s == nil {
-		p.r.eachAlt(func(alt *Alt) {
+		for _, alt := range p.r.Alts {
 			pset.predictNext(newState(alt))
-		})
+		}
 	} else {
 		pset.predict(p.s)
 		p.s.parents = nil
@@ -42,24 +42,24 @@ func (p *Parser) Parse(t *Token, tr *R) bool {
 	return true
 }
 
-func (p *Parser) Error() error {
-	return nil
-}
-
-func (p *Parser) Results() []*Node {
-	return p.results
-}
-
 func (p *Parser) collectResult(s *state) {
 	if s.complete() {
 		if s.rule() == p.r {
-			p.results = append(p.results, newNode(s))
+			p.results = append(p.results, s.node)
 		}
 		for _, parent := range s.parents {
 			p.collectResult(parent.advance(s))
 		}
 		s.parents = nil // OK
 	}
+}
+
+func (p *Parser) Error() error {
+	return nil
+}
+
+func (p *Parser) Results() []*Node {
+	return p.results
 }
 
 func (pset *stateSet) predict(s *state) {
@@ -73,13 +73,12 @@ func (pset *stateSet) predict(s *state) {
 }
 
 func (pset *stateSet) predictNext(s *state) {
-	if s.isTerm() {
-		return
-	}
-	for _, alt := range s.Rules[s.d].Alts {
-		if alt.termSet[pset.termAlt] {
-			if child, isNew := pset.add(alt, s); isNew {
-				pset.predictNext(child)
+	if s.d < len(s.Rules) {
+		for _, alt := range s.Rules[s.d].Alts {
+			if alt.termSet[pset.termAlt] {
+				if child, isNew := pset.add(alt, s); isNew {
+					pset.predictNext(child)
+				}
 			}
 		}
 	}

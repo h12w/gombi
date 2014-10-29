@@ -52,8 +52,8 @@ func (s *state) name() string {
 }
 
 func (s *state) tokenValue() string {
-	if s.token != nil && string(s.token.Value) != "" {
-		return escape(string(s.token.Value))
+	if s.node.token != nil && string(s.node.token.Value) != "" {
+		return escape(string(s.node.token.Value))
 	}
 	return ""
 }
@@ -77,7 +77,7 @@ func escape(s string) string {
 	return s
 }
 
-func (s *state) traverse(level int, visit func(*state, int)) {
+func (s *Node) traverse(level int, visit func(*Node, int)) {
 	if s == nil {
 		return
 	}
@@ -130,8 +130,13 @@ func (n *Node) String() string {
 	}
 	output := ""
 	indent := "\t"
-	n.traverse(0, func(s *state, level int) {
-		output += fmt.Sprintf("%s%s\n", strings.Repeat(indent, level), s.String())
+	n.traverse(0, func(s *Node, level int) {
+		identStr := strings.Repeat(indent, level)
+		if s.Rule().isTerm() {
+			output += fmt.Sprintf("%s%s ::= %v\n", identStr, s.alt.R.name, escape(string(s.token.Value)))
+		} else {
+			output += fmt.Sprintf("%s%s ::= %s\n", identStr, s.alt.R.name, s.alt.String())
+		}
 	})
 	return output
 }

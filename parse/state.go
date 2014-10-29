@@ -2,8 +2,8 @@ package parse
 
 type state struct {
 	*matchingRule
-	values []*state
-	d      int // dot position
+	d    int // dot position
+	node *Node
 }
 
 // matchingRule is the unchanged part during scanning.
@@ -12,30 +12,12 @@ type state struct {
 type matchingRule struct {
 	*Alt
 	parents []*state
-	token   *Token
-}
-type Token struct {
-	ID    int
-	Value []byte
-	Pos   int
 }
 
 func newState(alt *Alt) *state {
 	return &state{
 		matchingRule: &matchingRule{Alt: alt},
-		values:       make([]*state, len(alt.Rules)),
 	}
-}
-
-func (s *state) copy() *state {
-	c := *s
-	c.values = append([]*state(nil), s.values...)
-	return &c
-}
-
-func (s *state) step() *state {
-	s.d++
-	return s
 }
 
 func (s *state) complete() bool {
@@ -47,15 +29,21 @@ func (s *state) complete() bool {
 
 func (s *state) scan(t *Token) {
 	// not copied because a terminal state can never be a parent of multiple children
-	s.token = t
+	s.node = &Node{alt: s.Alt, token: t}
 	s.d++
 }
 
 func (s *state) advance(t *state) *state {
 	// copied because multiple alternatives shares the same parent
-	s = s.copy()
-	s.values[s.d] = t
-	return s.step()
+	c := *s
+	if c.node == nil {
+		c.node = &Node{alt: s.Alt, values: make([]*Node, len(s.Alt.Rules))}
+	} else {
+		c.node = s.node.copy()
+	}
+	c.node.values[c.d] = t.node
+	c.d++
+	return &c
 }
 
 type stateSet struct {
