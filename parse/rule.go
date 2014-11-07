@@ -37,9 +37,8 @@ type (
 )
 
 var (
-	EOF  = newTerm().As("EOF")
-	SOF  = newTerm().As("SOF")
-	Self = newTerm()
+	EOF = newTerm().As("EOF")
+	SOF = newTerm().As("SOF")
 )
 
 func NewBuilder() *Builder {
