@@ -242,7 +242,7 @@ func testParse(s gspec.S, P *R, tokens TT, expected string) {
 	}
 	results := parser.Results()
 	expect(len(results)).Equal(1)
-	expect("\n" + results[0].String()).Equal(gspec.Unindent(expected))
+	expect(results[0].String()).Equal(gspec.Unindent(expected))
 }
 
 type testToken struct {

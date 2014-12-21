@@ -138,7 +138,7 @@ func (n *Node) String() string {
 			output += fmt.Sprintf("%s%s ::= %s\n", identStr, s.alt.R.name, s.alt.String())
 		}
 	})
-	return output
+	return strings.TrimRight(output, "\n")
 }
 
 func parens(s string) string {
