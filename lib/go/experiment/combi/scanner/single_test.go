@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-var sampleGoFile = runtime.GOROOT() + "/src/pkg/go/scanner/scanner.go"
+var sampleGoFile = runtime.GOROOT() + "/src/go/scanner/scanner.go"
 
 func TestSingle(t *testing.T) {
 	//s := "'\\000'"

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/hailiang/gspec"
+	"h12.me/gspec"
 )
 
 var (

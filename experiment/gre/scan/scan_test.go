@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hailiang/gspec"
+	"h12.me/gspec"
 
 	//	ogdl "github.com/ogdl/flow"
 )

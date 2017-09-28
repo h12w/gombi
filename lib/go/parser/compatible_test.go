@@ -10,8 +10,8 @@ import (
 	"reflect"
 	"testing"
 
-	gom "github.com/hailiang/gombi/lib/go/parser"
-	"github.com/hailiang/gspec"
+	gom "h12.me/gombi/lib/go/parser"
+	"h12.me/gspec"
 	"github.com/ogdl/flow"
 )
 

@@ -10,7 +10,7 @@ import (
 
 	"go/token"
 
-	"github.com/hailiang/gombi/scan"
+	"h12.me/gombi/scan"
 )
 
 const (

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/hailiang/dfa"
+	"h12.me/dfa"
 )
 
 type Matcher struct {

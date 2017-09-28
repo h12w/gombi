@@ -1,7 +1,7 @@
 package scan
 
 import (
-	"github.com/hailiang/dfa"
+	"h12.me/dfa"
 )
 
 var (

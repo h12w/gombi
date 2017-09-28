@@ -3,7 +3,7 @@ package parser
 import (
 	"go/token"
 
-	"github.com/hailiang/gombi/parse"
+	"h12.me/gombi/parse"
 )
 
 var (

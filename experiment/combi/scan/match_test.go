@@ -3,7 +3,7 @@ package scan
 import (
 	"testing"
 
-	"github.com/hailiang/gspec"
+	"h12.me/gspec"
 )
 
 func TestMatch(t *testing.T) {

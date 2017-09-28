@@ -4,7 +4,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/hailiang/dfa"
+	"h12.me/dfa"
 )
 
 var invalidInputErr = errors.New("invalid input")

@@ -753,7 +753,7 @@ func BenchmarkScan(b *testing.B) {
 
 func BenchmarkScanFile(b *testing.B) {
 	b.StopTimer()
-	const filename = "/home/whl/go-hg/src/pkg/go/scanner/scanner.go"
+	const filename = "/home/whl/go-hg/src/go/scanner/scanner.go"
 	src, err := ioutil.ReadFile(filename)
 	if err != nil {
 		panic(err)

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"unicode/utf8"
 
-	"github.com/hailiang/gombi/experiment/combi/scan"
+	"h12.me/gombi/experiment/combi/scan"
 )
 
 const (

@@ -8,10 +8,10 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/hailiang/gombi/scan"
+	"h12.me/gombi/scan"
 )
 
-var sampleGoFile = runtime.GOROOT() + "/src/pkg/go/scanner/scanner.go"
+var sampleGoFile = runtime.GOROOT() + "/src/go/scanner/scanner.go"
 
 func TestSingle(t *testing.T) {
 	//	fmt.Println(int(token.INT))

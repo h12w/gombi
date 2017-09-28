@@ -3,7 +3,7 @@ package scanner
 import (
 	"go/token"
 
-	"github.com/hailiang/gombi/experiment/combi/scan"
+	"h12.me/gombi/experiment/combi/scan"
 )
 
 const (

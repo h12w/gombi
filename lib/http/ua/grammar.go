@@ -3,8 +3,8 @@ package ua
 import (
 	"io"
 
-	"github.com/hailiang/gombi/experiment/gre/scan"
-	"github.com/hailiang/gombi/parse"
+	"h12.me/gombi/experiment/gre/scan"
+	"h12.me/gombi/parse"
 )
 
 var (
