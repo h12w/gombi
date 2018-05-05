@@ -10,7 +10,7 @@ import (
 
 	"go/token"
 
-	"h12.me/gombi/scan"
+	"h12.io/gombi/scan"
 )
 
 const (

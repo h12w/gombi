@@ -3,7 +3,7 @@ package scanner
 import (
 	"go/token"
 
-	"h12.me/gombi/experiment/gre/scan"
+	"h12.io/gombi/experiment/gre/scan"
 )
 
 const (

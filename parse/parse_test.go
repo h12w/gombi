@@ -3,7 +3,7 @@ package parse
 import (
 	"testing"
 
-	"h12.me/gspec"
+	"h12.io/gspec"
 )
 
 type testScanner struct {

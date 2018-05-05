@@ -7,7 +7,7 @@ practical, reasonably fast and extremely easy to use.
 Quick start
 -----------
 ```bash
-go get -u h12.me/gombi
+go get -u h12.io/gombi
 ```
 
 Design

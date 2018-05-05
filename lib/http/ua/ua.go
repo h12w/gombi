@@ -3,7 +3,7 @@ package ua
 import (
 	"strings"
 
-	"h12.me/gombi/parse"
+	"h12.io/gombi/parse"
 )
 
 type Product struct {

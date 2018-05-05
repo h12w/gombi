@@ -5,8 +5,8 @@ import (
 	"os"
 	"unicode/utf8"
 
-	"h12.me/dfa"
-	"h12.me/gombi/scan"
+	"h12.io/dfa"
+	"h12.io/gombi/scan"
 )
 
 const (
@@ -252,8 +252,8 @@ func spec() (tokMatcher, errMatcher *scan.Matcher) {
 	fmt.Fprint(f, `
 package scanner
 import (
-	"h12.me/dfa"
-	"h12.me/gombi/scan"
+	"h12.io/dfa"
+	"h12.io/gombi/scan"
 )
 `)
 	fmt.Fprintln(f, "var tokMatcherCache = ")

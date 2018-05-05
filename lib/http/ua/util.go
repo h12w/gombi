@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"h12.me/gombi/parse"
+	"h12.io/gombi/parse"
 	ogdl "github.com/ogdl/flow"
 )
 

@@ -6,7 +6,7 @@ import (
 	"go/scanner"
 	"go/token"
 
-	"h12.me/gombi/parse"
+	"h12.io/gombi/parse"
 )
 
 type parser struct {

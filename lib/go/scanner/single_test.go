@@ -8,7 +8,7 @@ import (
 	"sort"
 	"testing"
 
-	"h12.me/gombi/scan"
+	"h12.io/gombi/scan"
 )
 
 var sampleGoFile = runtime.GOROOT() + "/src/go/scanner/scanner.go"

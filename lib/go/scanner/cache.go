@@ -1,8 +1,8 @@
 
 package scanner
 import (
-	"h12.me/dfa"
-	"h12.me/gombi/scan"
+	"h12.io/dfa"
+	"h12.io/gombi/scan"
 )
 var tokMatcherCache = 
 &scan.Matcher{

@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"testing"
 
-	"h12.me/gspec"
+	"h12.io/gspec"
 	"github.com/ogdl/flow"
 )
 

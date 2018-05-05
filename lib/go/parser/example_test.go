@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"go/token"
 
-	"h12.me/gombi/lib/go/parser"
+	"h12.io/gombi/lib/go/parser"
 )
 
 func ExampleParseFile() {
@@ -31,5 +31,5 @@ func ExampleParseFile() {
 	//
 	// "fmt"
 	// "go/token"
-	// "h12.me/gombi/lib/go/parser"
+	// "h12.io/gombi/lib/go/parser"
 }

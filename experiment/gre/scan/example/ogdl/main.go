@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"h12.me/gombi/scan"
+	"h12.io/gombi/scan"
 )
 
 func main() {
